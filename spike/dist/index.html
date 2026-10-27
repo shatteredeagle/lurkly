@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>Lurkly spike</title>
+<style>body{font:14px system-ui;background:#111;color:#eee;margin:12px}button,input{margin:2px;padding:6px}
+pre{background:#000;padding:8px;max-height:200px;overflow:auto;white-space:pre-wrap}</style>
+<button onclick="run('open_login')">1. Open Twitch login</button>
+<button onclick="run('has_token')">2. Check token</button>
+<button onclick="run('fetch_subs')">3. Fetch subs (GQL)</button>
+<input id=ch placeholder="channel login" value=""><button onclick="embed()">4. Embed player</button>
+<pre id=log>ready. origin: </pre><div id=player style="height:420px"></div>
+<script src="https://embed.twitch.tv/embed/v1.js"></script>
+<script>
+document.getElementById('log').textContent+=location.origin+'\n';
+async function run(c){const l=document.getElementById('log');try{l.textContent+='> '+c+'\n'+await window.__TAURI__.core.invoke(c)+'\n'}catch(e){l.textContent+='ERR '+e+'\n'}}
+function embed(){const c=document.getElementById('ch').value.trim();if(!c)return;document.getElementById('player').innerHTML='';
+new Twitch.Embed('player',{width:'100%',height:420,channel:c,parent:['localhost'],layout:'video',autoplay:true,muted:false})}
+</script>
