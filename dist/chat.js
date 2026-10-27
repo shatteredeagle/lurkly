@@ -460,6 +460,13 @@ function show(login) {
   if (ch.paused) { ch.list.scrollTop = ch.st; ch.last = -9; } else toBottom(ch);
   renderState(); refreshStatus(); schedule();
 }
+/* Drop every channel and the cached sign-in state (after sign-out, so a new login starts clean). */
+function reset() {
+  if (!O) return; clearTimeout(hideTimer);
+  for (const l of [...chans.keys()]) leave(l);
+  active = null; warm = []; gs = { scope: null, me: null, at: 0 };
+  if (X.root) X.root.hidden = true; if (picker && picker.isOpen()) picker.close(false); showErr("");
+}
 function hide() {
   if (!O) return; active = null; if (X.root) X.root.hidden = true; if (picker && picker.isOpen()) picker.close(false);
   clearTimeout(hideTimer); hideTimer = setTimeout(() => { for (const l of [...chans.keys()]) leave(l); }, 60000);
@@ -473,5 +480,5 @@ function setPrefs(p) {
   X.root.dataset.density = prefs.density; X.root.classList.toggle("ts-on", !!prefs.timestamps); X.root.classList.toggle("nobadge", !prefs.badges);
 }
 function focusInput() { if (X.input && !X.root.hidden) { X.input.focus(); return true; } return false; }
-window.LurklyChat = { init, show, hide, refreshTheme, setPrefs, focusInput };
+window.LurklyChat = { init, show, hide, reset, refreshTheme, setPrefs, focusInput };
 })();

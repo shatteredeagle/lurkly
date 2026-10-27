@@ -504,7 +504,7 @@ async function openAlerts(){closePops();await loadAlerts();renderAlertsHead();$(
 $("alertBtn").onclick=e=>{e.stopPropagation();const o=$("alertsPop").classList.contains("on");closePops();if(!o)openAlerts()};
 $("aSearch").oninput=renderAlertsList;
 /* live polling */
-function reset(){sess++;signedIn=false;live=[];cells=[];cur=null;focus=0;closed.clear();first=true;renderTabs();renderGrid()}
+function reset(){sess++;signedIn=false;chatKey="";chatStates={};if(window.LurklyChat)LurklyChat.reset();live=[];cells=[];cur=null;focus=0;closed.clear();first=true;renderTabs();renderGrid()}
 function applyLive(list){
   const seen=new Set(list.map(c=>c.login));
   closed.forEach(l=>{if(!seen.has(l))closed.delete(l)});
