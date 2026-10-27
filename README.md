@@ -5,7 +5,7 @@
 # Lurkly
 
 **A tab for every channel you follow that is live.**
-A minimal Twitch viewer for Linux.
+A minimal Twitch viewer for Linux and Windows.
 
 [![CI](https://github.com/shatteredeagle/lurkly/actions/workflows/ci.yml/badge.svg)](https://github.com/shatteredeagle/lurkly/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
@@ -65,8 +65,9 @@ Download a package from the [latest release](../../releases/latest):
 | Fedora, openSUSE | `.rpm` |
 | Arch | `.pkg.tar.zst`, or `makepkg -si` from a clone |
 | Anything else | `.AppImage` |
+| Windows 10 / 11 | `-setup.exe` (per-user NSIS installer, unsigned, so SmartScreen may ask you to confirm) |
 
-Runtime needs `webkit2gtk-4.1` and `gtk3`. Only Linux is built and tested.
+On Linux the runtime needs `webkit2gtk-4.1` and `gtk3`. On Windows it uses the WebView2 runtime that ships with Windows 11 (the installer fetches it on Windows 10). Linux (KDE Plasma, Wayland) is the tested platform; the Windows build is produced by CI and has had less testing.
 
 ## First run
 
@@ -89,7 +90,7 @@ Twitch embed player + chat ──▶ webview, served from localhost
 
 ## FAQ
 
-**Why only Linux?** Lurkly is built with Tauri 2, which also targets Windows and macOS, but the embed and login behaviour has only been tried on WebKitGTK. Other platforms may come later.
+**Why no macOS build?** Lurkly is built with Tauri 2, which also targets macOS, but nobody has tried the embed and sign-in behaviour on WebKit for macOS yet. It may come later.
 
 **Why is chat the official embed and not a custom one?** It is the real chat, so you can type, and your badges and subscriber emotes work with no maintenance. The trade-off is that it looks like stock Twitch chat and can only be themed light or dark.
 

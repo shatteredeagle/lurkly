@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 First release.
 
 ### Added
+- Windows build: a per-user NSIS installer (`-setup.exe`), built by CI alongside the Linux packages.
 - One tab per live followed channel.
 - Sign-in with the Twitch device-code flow.
 - Official embed player with hidden controls, plus click, wheel and key controls.

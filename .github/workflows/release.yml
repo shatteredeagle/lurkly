@@ -13,6 +13,8 @@ jobs:
   bundles:
     name: .deb / .rpm / AppImage
     runs-on: ubuntu-22.04
+    outputs:
+      release_id: ${{ steps.tauri.outputs.releaseId }}
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +43,7 @@ jobs:
             echo 'body<<EOF_NOTES'
             cat "$RUNNER_TEMP/notes.md"
             printf '\n---\n\n'
-            echo '- `.deb` (Debian/Ubuntu), `.rpm` (Fedora/openSUSE), AppImage (anything else)'
+            echo '- `.deb` (Debian/Ubuntu), `.rpm` (Fedora/openSUSE), AppImage (anything else), `-setup.exe` (Windows 10/11; unsigned, so SmartScreen may warn)'
             echo '- Arch: the `.pkg.tar.zst` below, or `makepkg -si` from a clone.'
             echo 'Needs `webkit2gtk-4.1`.'
             echo 'EOF_NOTES'
@@ -58,6 +60,7 @@ jobs:
           workspaces: src-tauri
 
       - uses: tauri-apps/tauri-action@v0
+        id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NO_STRIP: "1"
@@ -67,6 +70,23 @@ jobs:
           releaseBody: ${{ steps.body.outputs.body }}
           releaseDraft: false
           prerelease: false
+
+  windows:
+    name: Windows installer
+    needs: bundles
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          releaseId: ${{ needs.bundles.outputs.release_id }}
+          args: --bundles nsis
 
   arch:
     name: Arch package

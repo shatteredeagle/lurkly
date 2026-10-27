@@ -14,6 +14,6 @@
     "targets": ["deb", "rpm", "appimage"],
     "category": "Utility",
     "shortDescription": "Minimal Twitch window with a tab per live followed channel",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.png"]
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.png", "icons/icon.ico"]
   }
 }
