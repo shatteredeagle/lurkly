@@ -7,6 +7,7 @@ fn main() {
             "logout",
             "get_live",
             "refresh_now",
+            "test_alert",
             "take_pending_open",
             "get_alerts",
             "set_alerts_global",

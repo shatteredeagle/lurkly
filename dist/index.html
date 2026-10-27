@@ -472,12 +472,14 @@ function renderAlertsHead(){if(!av)return;const g=av.settings,sn=g.snooze_until*
   <div class="row"><span>Quiet hours</span><span class="qt"><input type="time" id="qFrom" value="${esc(g.quiet.from)}"><i>to</i><input type="time" id="qTo" value="${esc(g.quiet.to)}"><div class="sw ${g.quiet.enabled?"on":""}" id="qEn" role="switch" aria-checked="${g.quiet.enabled}"></div></span></div>
   <div class="row"><span>${sn?"Snoozed until "+t(g.snooze_until*1000):"Snooze"}</span><button class="link" id="aSnooze">${sn?"Resume":"1 hour"}</button></div>
   <div class="row"><span>Keep running in the tray<small>${av.tray_ok?"When the window is closed":"No tray available here"}</small></span><div class="sw ${g.tray&&av.tray_ok?"on":""}" id="aTray" role="switch" aria-checked="${g.tray}" ${av.tray_ok?"":'style="opacity:.4;pointer-events:none"'}></div></div>
-  ${av.portable?"":`<div class="row"><span>Start at login<small>Opens straight to the tray</small></span><div class="sw ${av.autostart?"on":""}" id="aAuto" role="switch" aria-checked="${av.autostart}"></div></div>`}`;
+  <div class="row"><span>Test alert<small>Shows in 5 s; close the window first to try the tray</small></span><button class="link" id="aTest">Send test</button></div>
+    ${av.portable?"":`<div class="row"><span>Start at login<small>Opens straight to the tray</small></span><div class="sw ${av.autostart?"on":""}" id="aAuto" role="switch" aria-checked="${av.autostart}"></div></div>`}`;
   $("aEn").onclick=()=>{g.enabled=!g.enabled;saveGlobal();$("alertBtn").setAttribute("aria-pressed",g.enabled&&bells.size>0);renderAlertsHead()};
   $("qEn").onclick=()=>{g.quiet.enabled=!g.quiet.enabled;saveGlobal();renderAlertsHead()};
   $("qFrom").onchange=e=>{g.quiet.from=e.target.value||"22:00";saveGlobal()};$("qTo").onchange=e=>{g.quiet.to=e.target.value||"08:00";saveGlobal()};
   $("aSnooze").onclick=async()=>{await inv("snooze_alerts",{minutes:sn?0:60});g.snooze_until=sn?0:Math.floor(Date.now()/1000)+3600;renderAlertsHead()};
   $("aTray").onclick=()=>{g.tray=!g.tray;saveGlobal();renderAlertsHead()};
+  $("aTest").onclick=()=>{const l=(Object.values(g.channels)[0]||{}).login||cur||(live[0]||{}).login||"twitch";inv("test_alert",{login:l,delay:5});toast("Test alert in 5 seconds")};
   if($("aAuto"))$("aAuto").onclick=async()=>{try{await inv("set_autostart",{on:!av.autostart});av.autostart=!av.autostart}catch(e){toast("Couldn't change start at login")}renderAlertsHead()}}
 function renderAlertsList(){const q=$("aSearch").value.trim().toLowerCase();
   if(!followed){$("aList").innerHTML='<div class="amsg">Loading…</div>';return}

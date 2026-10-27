@@ -634,6 +634,20 @@ fn get_live(state: State<'_, AppState>) -> Vec<Live> {
     state.live.lock().unwrap().clone()
 }
 
+/// A fake go-live notification after `delay` seconds, to try clicks, focus and the tray.
+#[tauri::command]
+fn test_alert(app: tauri::AppHandle, login: String, delay: u64) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+        notify(
+            &app,
+            &format!("{login} is live (test)"),
+            "This is a test alert. Click it to open the channel.",
+            Some(login),
+        );
+    });
+}
+
 #[tauri::command]
 fn refresh_now(state: State<'_, AppState>) {
     state.poke.notify_one();
@@ -865,6 +879,7 @@ fn main() {
             logout,
             get_live,
             refresh_now,
+            test_alert,
             take_pending_open,
             get_alerts,
             set_alerts_global,

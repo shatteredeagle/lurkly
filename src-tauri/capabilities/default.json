@@ -33,6 +33,7 @@
     "allow-snooze-alerts",
     "allow-set-channel-alert",
     "allow-set-autostart",
-    "allow-followed-channels"
+    "allow-followed-channels",
+    "allow-test-alert"
   ]
 }
