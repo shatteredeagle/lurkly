@@ -158,6 +158,7 @@ body.dragging iframe{pointer-events:none}
 .chat-h{justify-content:flex-start}
 /* fullscreen: the whole window goes fullscreen and the tab bar floats over the video */
 body.fs .bar{position:absolute;top:0;left:0;right:0;z-index:9;background:rgba(14,13,19,.52);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px);border-bottom-color:rgba(255,255,255,.08);color:#ecebf2;transition:opacity .2s,transform .2s}
+body.fs .rz{display:none}
 body.fs .win{border:0;border-radius:0}
 body.fs .tab{color:rgba(236,235,242,.7)}body.fs .tab:hover{background:rgba(255,255,255,.08);color:#fff}
 body.fs .tab.active{background:rgba(255,255,255,.14);color:#fff}
@@ -219,13 +220,14 @@ body.fs.idle,body.fs.idle #shield{cursor:none}
 <script>
 const $=id=>document.getElementById(id), T=window.__TAURI__, inv=(c,a)=>T.core.invoke(c,a), W=T.window.getCurrentWindow();
 const store=(k,v)=>{try{if(v===undefined)return localStorage.getItem("lurkly."+k);localStorage.setItem("lurkly."+k,v)}catch(e){return null}};
+let sess=0,polling=false;
 let live=[], cur=null, closed=new Set(), signedIn=false, first=true;
 const LAYOUTS=[["1x1","Single"],["2x1","Side by side"],["1x2","Stacked"],["2x2","Quad"],["3x2","3 × 2"],["3x3","3 × 3"]];
 let layout=LAYOUTS.some(l=>l[0]===store("layout"))?store("layout"):"1x1", cells=[], focus=0, players=[], userMuted=false;
 const dims=()=>layout.split("x").map(Number);
 const tabs=$("tabs"), fmt=n=>n>=1000?(n/1000).toFixed(1).replace(".0","")+"k":n;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const avatar=c=>`<span class="av" style="background:var(--acc)">${c.avatar?`<img src="${esc(c.avatar)}" alt="" onerror="this.remove()">`:""}${esc(c.name[0]||"?").toUpperCase()}</span>`;
+const avatar=c=>`<span class="av" style="background:var(--acc)">${c.avatar?`<img src="${esc(c.avatar)}" alt="" onerror="this.remove()">`:""}${esc([...(c.name||"?")][0]).toUpperCase()}</span>`;
 /* window chrome */
 $("wMin").onclick=()=>W.minimize();$("wMax").onclick=()=>W.toggleMaximize();$("wClose").onclick=()=>W.close();
 $("bar").addEventListener("mousedown",e=>{if(e.button===0&&!e.target.closest("button,.tab,.more"))W.startDragging()});
@@ -235,14 +237,15 @@ for(const d of ["n","s","e","w","ne","nw","se","sw"]){const r=document.createEle
  r.addEventListener("mousedown",e=>{e.preventDefault();W.startResizeDragging(dir)});document.body.appendChild(r)}
 /* tabs */
 function renderTabs(){
+  $("tip").classList.remove("on");
   tabs.innerHTML="";live.forEach(c=>{const b=document.createElement("button");
-   b.className="tab"+(c.login===cur?" active":"")+(cells.includes(c.login)&&c.login!==cur?" ing":"")+(c.off?" offline":"")+(c.fresh?" fresh":"");b.role="tab";b.dataset.id=c.login;
+   b.className="tab"+(c.login===cur?" active":"")+(cells.includes(c.login)&&c.login!==cur?" ing":"")+(c.off?" offline":"")+(c.fresh?" fresh":"");b.setAttribute("role","tab");b.setAttribute("aria-selected",c.login===cur);b.dataset.id=c.login;
    b.innerHTML=`${avatar(c)}<span class="name">${esc(c.name)}</span><span class="x" title="Close tab (middle-click)">×</span>`;
    b.onclick=e=>{if(dragged)return;if(e.target.classList.contains("x"))close(c.login);else select(c.login)};
    b.onmousedown=e=>startTabDrag(e,c,b);
    b.onauxclick=e=>{if(e.button===1){e.preventDefault();close(c.login)}};
    b.onmouseenter=()=>tip(b,c);b.onmouseleave=()=>$("tip").classList.remove("on");tabs.appendChild(b)});
-  layoutTabs();
+  layoutTabs();live.forEach(c=>delete c.fresh);
 }
 function tip(el,c){const t=$("tip"),r=el.getBoundingClientRect();t.innerHTML=`<b>${esc(c.name)}</b><span>${esc(c.game)} · ${fmt(c.viewers)} viewers</span><br><span>${esc(c.title)}</span>`;t.style.left=Math.max(8,Math.min(r.left,innerWidth-250))+"px";t.style.top="42px";t.classList.add("on")}
 const dark=()=>document.documentElement.dataset.theme==="dark";
@@ -258,6 +261,7 @@ function fillCells(){
 }
 function applyAudio(){players.forEach((p,i)=>{if(p)try{p.setMuted(i!==focus||userMuted)}catch(e){}})}
 function renderGrid(){
+  if(typeof Twitch==="undefined"){toast("Couldn't load the Twitch player (offline?)");return}
   const [C,R]=dims(),n=C*R,g=$("grid");
   g.style.gridTemplateColumns=`repeat(${C},1fr)`;g.style.gridTemplateRows=`repeat(${R},1fr)`;g.classList.toggle("multi",n>1);
   while(g.children.length>n){g.lastChild.remove();players.pop()}
@@ -269,7 +273,7 @@ function renderGrid(){
     if(el.dataset.login!==login){
       el.dataset.login=login;el.classList.toggle("blank",!login);players[i]=null;
       const pl=el.querySelector(".pl");pl.innerHTML="";
-      if(login){pl.id="pl"+i+"_"+Date.now();players[i]=new Twitch.Player(pl.id,{channel:login,parent:["localhost"],autoplay:true,muted:i!==focus||userMuted,controls:false,width:"100%",height:"100%"})}
+      if(login){pl.id="pl"+i+"_"+Date.now();players[i]=new Twitch.Player(pl.id,{channel:login,parent:["localhost"],autoplay:true,muted:i!==focus||userMuted,controls:false,width:"100%",height:"100%"});players[i].addEventListener(Twitch.Player.READY,applyAudio)}
     }
     const c=live.find(x=>x.login===login);el.querySelector(".lbl").textContent=c?c.name:"";
   }
@@ -295,10 +299,12 @@ function startTabDrag(e,c,tab){
     ghost.remove();document.body.classList.remove("tdrag","dragging");[...$("grid").children].forEach(el=>el.classList.remove("drop"));
     dragged=true;setTimeout(()=>dragged=false,60);
     const i=cellAt(ev.clientX,ev.clientY);if(i>=0)assignCell(i,c.login)};
-  addEventListener("mousemove",mv);addEventListener("mouseup",up)}
+  addEventListener("mousemove",mv);addEventListener("mouseup",up);
+  const cancel=ev=>{if(ev.type==="keydown"&&ev.key!=="Escape")return;removeEventListener("blur",cancel);removeEventListener("keydown",cancel);up({clientX:-1,clientY:-1})};
+  addEventListener("blur",cancel);addEventListener("keydown",cancel)}
 function focusCell(i){focus=i;cur=cells[i]||null;if(cur)store("last",cur);renderTabs();renderGrid()}
 const fp=()=>players[focus];
-function vol(d){const p=fp();if(!p)return;const v=Math.max(0,Math.min(1,Math.round((p.getVolume()+d)*100)/100));userMuted=false;p.setMuted(false);p.setVolume(v);toast("Volume "+Math.round(v*100)+"%")}
+function vol(d){const p=fp();if(!p)return;const cv=p.getVolume();if(!isFinite(cv))return;const v=Math.max(0,Math.min(1,Math.round((cv+d)*100)/100));userMuted=false;p.setMuted(false);p.setVolume(v);toast("Volume "+Math.round(v*100)+"%")}
 function mute(){userMuted=!userMuted;applyAudio();toast(userMuted?"Muted":"Unmuted")}
 /* Each cell has a shield over its player (controls are hidden): click focuses / pauses, double-click fullscreens, wheel changes volume. */
 let clickT=0;
@@ -308,7 +314,8 @@ function wireCell(el,i){const sh=el.querySelector(".shield");
   el.querySelector(".pick").addEventListener("click",e=>{e.stopPropagation();openMenuFor(i,el)});
   sh.addEventListener("wheel",e=>{e.preventDefault();vol(e.deltaY<0?.05:-.05)},{passive:false})}
 let fs=false,idleT=0;
-async function setFs(v){fs=v;await W.setFullscreen(v);document.body.classList.toggle("fs",v);wake()}
+async function setFs(v){try{await W.setFullscreen(v);fs=v}catch(e){return}document.body.classList.toggle("fs",fs);wake()}
+addEventListener("resize",()=>{W.isFullscreen().then(v=>{if(v!==fs){fs=v;document.body.classList.toggle("fs",v);wake()}}).catch(()=>{})});
 function wake(){document.body.classList.remove("idle");clearTimeout(idleT);if(fs)idleT=setTimeout(()=>{if(!document.querySelector(".bar:hover,.pop.on"))document.body.classList.add("idle")},2500)}
 addEventListener("mousemove",wake);
 function setLayout(l){
@@ -318,8 +325,10 @@ function setLayout(l){
 function buildLayouts(){const m=$("layoutPop");m.innerHTML=LAYOUTS.map(([l,name])=>{const [C,R]=l.split("x").map(Number);
   return `<button class="lo ${l===layout?"on":""}" data-l="${l}"><span class="th" style="grid-template-columns:repeat(${C},1fr);grid-template-rows:repeat(${R},1fr)">${"<i></i>".repeat(C*R)}</span>${name}<small>${C}×${R}</small></button>`}).join("");
   m.querySelectorAll(".lo").forEach(b=>b.onclick=()=>setLayout(b.dataset.l))}
+let chatKey="";
 function mountChat(){
   const c=live.find(x=>x.login===cur);
+  const key=(c&&chatOn?c.login:"")+"|"+dark();if(key===chatKey){$("chatT").textContent=c?"Chat · "+c.name:"Chat";return}chatKey=key;
   $("chatBox").innerHTML=c&&chatOn?`<iframe src="https://www.twitch.tv/embed/${encodeURIComponent(c.login)}/chat?parent=localhost${dark()?"&darkpopout":""}"></iframe>`:"";
   $("chatT").textContent=c?"Chat · "+c.name:"Chat";
 }
@@ -332,7 +341,8 @@ function close(login){closed.add(login);live=live.filter(x=>x.login!==login);cel
 /* Tabs fill the bar (shrinking to 96px), then the ones that no longer fit collapse into the "+N" list. */
 const TAB_MIN=96;
 function layoutTabs(){
-  const els=[...tabs.children],fit=Math.max(1,Math.floor((tabs.clientWidth-6+2)/(TAB_MIN+2)));
+  const els=[...tabs.children],calc=()=>Math.max(1,Math.floor((tabs.clientWidth-6+2)/(TAB_MIN+2)));
+  let fit=calc();$("more").classList.toggle("on",els.length>fit);fit=calc();
   const hide=els.length>fit?els.length-fit:0;
   els.forEach(e=>e.style.display="");
   if(hide){
@@ -358,12 +368,13 @@ const closePops=()=>{$("menu").classList.remove("on");$("settings").classList.re
 $("gridBtn").onclick=e=>{e.stopPropagation();const o=$("layoutPop").classList.contains("on");closePops();if(!o){buildLayouts();$("layoutPop").classList.add("on")}};
 $("more").onclick=e=>{e.stopPropagation();const o=$("menu").classList.contains("on");closePops();if(!o){menuTarget=null;$("menu").style.left="46px";$("menu").style.top="40px";buildMenu();$("menu").classList.add("on")}};
 function openMenuFor(i,el){closePops();menuTarget=i;buildMenu();const m=$("menu"),r=el.getBoundingClientRect(),w=$("win").getBoundingClientRect();
-  m.style.left=Math.max(8,Math.min(r.right-280-w.left,w.width-280))+"px";m.style.top=Math.max(40,r.top-w.top+36)+"px";m.classList.add("on")}
+  m.style.left=Math.max(8,Math.min(r.right-280-w.left,w.width-280))+"px";m.style.top=Math.max(40,Math.min(r.top-w.top+36,w.height-Math.min(380,m.scrollHeight||380)-8))+"px";m.classList.add("on")}
+addEventListener("blur",()=>closePops());
 $("setBtn").onclick=e=>{e.stopPropagation();const o=$("settings").classList.contains("on");closePops();if(!o)$("settings").classList.add("on")};
 document.addEventListener("click",e=>{if(!e.target.closest(".pop"))closePops()});
 $("sw3").onclick=()=>{const on=$("sw3").classList.toggle("on");W.setAlwaysOnTop(on)};
 $("sw4").onclick=()=>{$("sw4").classList.toggle("on");document.body.classList.toggle("mini",$("sw4").classList.contains("on"))};
-$("signOut").onclick=async()=>{await inv("logout");closePops();signedIn=false;live=[];cells=[];cur=null;renderTabs();renderGrid();showLogin()};
+$("signOut").onclick=async()=>{reset();closePops();await inv("logout").catch(()=>{});showLogin()};
 /* updates: notify only, opens the GitHub release page */
 let upd=null,autoUpd=store("autoupd")!=="0";
 async function checkUpdate(manual){
@@ -383,7 +394,7 @@ function theme(t){store("theme",t);const d=t==="auto"?mq.matches:t==="dark";docu
 document.querySelectorAll("#themeSeg button").forEach(b=>b.onclick=()=>theme(b.dataset.t));
 theme(store("theme")||"auto");
 /* keys */
-addEventListener("keydown",e=>{const k=e.key;
+addEventListener("keydown",e=>{if(e.altKey||e.metaKey||e.target.closest("input,textarea,[contenteditable]"))return;const k=e.key.length===1?e.key.toLowerCase():e.key;if(e.repeat&&!k.startsWith("Arrow"))return;
  if(k==="c"&&!e.ctrlKey)setChat(!chatOn);else if(e.ctrlKey&&k==="k"){e.preventDefault();$("more").click()}
  else if(e.ctrlKey&&/[1-9]/.test(k)){e.preventDefault();live[+k-1]&&select(live[+k-1].login)}
  else if(e.ctrlKey&&k==="Tab"){e.preventDefault();if(!live.length)return;const i=live.findIndex(x=>x.login===cur);select(live[(i+(e.shiftKey?-1:1)+live.length)%live.length].login)}
@@ -391,11 +402,17 @@ addEventListener("keydown",e=>{const k=e.key;
  else if(e.ctrlKey&&k==="w"){e.preventDefault();cur&&close(cur)}else if(e.ctrlKey&&k==="m")$("sw4").click();else if(k==="Escape"){closePops();if(fs)setFs(false)}});
 function toast(t){const x=$("toast");x.textContent=t;x.classList.add("on");setTimeout(()=>x.classList.remove("on"),2800)}
 /* live polling */
+function reset(){sess++;signedIn=false;live=[];cells=[];cur=null;focus=0;closed.clear();first=true;renderTabs();renderGrid()}
 async function poll(){
-  if(!signedIn)return;
+  if(!signedIn||polling)return;
+  polling=true;const gen=sess;
+  try{await pollOnce(gen)}finally{polling=false}}
+async function pollOnce(gen){
   let list;try{list=await inv("live_follows")}catch(e){
-    if(String(e)==="auth"){signedIn=false;showLogin();return}
+    if(gen!==sess)return;
+    if(String(e)==="auth"){reset();showLogin();return}
     console.warn("poll failed",e);return}
+  if(gen!==sess||!signedIn)return;
   const seen=new Set(list.map(c=>c.login));
   closed.forEach(l=>{if(!seen.has(l))closed.delete(l)});
   live.forEach(c=>{if(!seen.has(c.login)&&!c.off){c.off=true;c.offAt=Date.now();toast(c.name+" went offline")}});
@@ -410,23 +427,26 @@ async function poll(){
   first=false;
 }
 /* login */
-function showLogin(){$("loginT").textContent="Sign in to Twitch";$("loginS").textContent="Your followed channels show up here as tabs when they go live.";$("code").hidden=true;$("loginBtn").hidden=false;$("login").classList.add("on");$("empty").classList.remove("on")}
+function showLogin(){loginRun++;$("loginT").textContent="Sign in to Twitch";$("loginS").textContent="Your followed channels show up here as tabs when they go live.";$("code").hidden=true;$("loginBtn").hidden=false;$("login").classList.add("on");$("empty").classList.remove("on")}
+let loginRun=0;
 $("loginBtn").onclick=async()=>{
+  if($("loginBtn").disabled)return;$("loginBtn").disabled=true;const tok=++loginRun;
   try{const d=await inv("auth_start");
     $("loginBtn").hidden=true;$("loginT").textContent="Approve Lurkly in the Twitch window";$("loginS").textContent="Log in if asked, then press Authorize. Code:";$("code").textContent=d.user_code;$("code").hidden=false;
     const end=Date.now()+d.expires_in*1000;
-    while(Date.now()<end){await new Promise(r=>setTimeout(r,d.interval*1000));
+    while(Date.now()<end){await new Promise(r=>setTimeout(r,Math.max(1,d.interval||5)*1000));if(tok!==loginRun)return;
       const r=await inv("auth_poll",{deviceCode:d.device_code});
-      if(r==="ok"){await start();return}}
+      if(r==="ok"){await start();return}
+      if(r==="expired"||r==="denied"){showLogin();toast(r==="denied"?"Sign-in was denied":"Sign-in expired, try again");return}}
     showLogin();toast("Sign-in timed out")
-  }catch(e){showLogin();toast("Sign-in failed: "+e)}};
+  }catch(e){showLogin();toast("Sign-in failed: "+e)}finally{$("loginBtn").disabled=false}};
 async function start(){
   const me=await inv("auth_status");
   if(!me){showLogin();return}
   signedIn=true;first=true;$("acctName").textContent=me;$("login").classList.remove("on");
   await poll();
 }
-setInterval(()=>{poll();const n=Date.now();if(live.some(c=>c.off&&n-c.offAt>30000))poll()},60000);
+setInterval(poll,60000);
 setInterval(()=>{if(live.some(c=>c.off&&Date.now()-c.offAt>30000)){live=live.filter(c=>!(c.off&&Date.now()-c.offAt>30000));fillCells();renderTabs();renderGrid();$("empty").classList.toggle("on",!live.length)}},5000);
 if(chatOn)setChat(true);
 start();

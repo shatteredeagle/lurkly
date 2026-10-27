@@ -30,7 +30,9 @@ pub fn is_newer(current: &str, latest: &str) -> bool {
 
 /// The latest published (non-draft, non-prerelease) release, or None when there are none yet.
 pub async fn latest(http: &reqwest::Client) -> Result<Option<Release>, String> {
-    let api = env!("CARGO_PKG_REPOSITORY").replace("https://github.com/", "https://api.github.com/repos/") + "/releases/latest";
+    let api = env!("CARGO_PKG_REPOSITORY")
+        .replace("https://github.com/", "https://api.github.com/repos/")
+        + "/releases/latest";
     let resp = http
         .get(api)
         .header("User-Agent", concat!("lurkly/", env!("CARGO_PKG_VERSION")))
@@ -41,9 +43,17 @@ pub async fn latest(http: &reqwest::Client) -> Result<Option<Release>, String> {
     if resp.status() == reqwest::StatusCode::NOT_FOUND {
         return Ok(None);
     }
-    let v: Value = resp.error_for_status().map_err(|e| e.to_string())?.json().await.map_err(|e| e.to_string())?;
+    let v: Value = resp
+        .error_for_status()
+        .map_err(|e| e.to_string())?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
     let tag = v["tag_name"].as_str().ok_or("Unexpected GitHub response")?;
-    Ok(Some(Release { version: tag.trim_start_matches('v').to_string(), url: v["html_url"].as_str().unwrap_or("").to_string() }))
+    Ok(Some(Release {
+        version: tag.trim_start_matches('v').to_string(),
+        url: v["html_url"].as_str().unwrap_or("").to_string(),
+    }))
 }
 
 #[cfg(test)]

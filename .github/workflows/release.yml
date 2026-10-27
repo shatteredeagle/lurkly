@@ -1,0 +1,90 @@
+name: Release
+
+# Push a tag like v0.2.0 (it must match the version in src-tauri/Cargo.toml and tauri.conf.json,
+# and CHANGELOG.md must have a "## [0.2.0]" section, which becomes the release notes).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  bundles:
+    name: .deb / .rpm / AppImage
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag must match the app version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          cargo_v=$(grep -m1 '^version' src-tauri/Cargo.toml | cut -d'"' -f2)
+          conf_v=$(grep -m1 '"version"' src-tauri/tauri.conf.json | cut -d'"' -f4)
+          echo "tag=$tag Cargo.toml=$cargo_v tauri.conf.json=$conf_v"
+          [ "$tag" = "$cargo_v" ] && [ "$tag" = "$conf_v" ]
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          awk -v v="$tag" '
+            /^## \[/ { if (on) exit; if (index($0, "## [" v "]") == 1) { on = 1; next } }
+            on { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          [ -s "$RUNNER_TEMP/notes.md" ] || { echo "No CHANGELOG.md section for $tag"; exit 1; }
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Release body
+        id: body
+        run: |
+          {
+            echo 'body<<EOF_NOTES'
+            cat "$RUNNER_TEMP/notes.md"
+            printf '\n---\n\n'
+            echo '- `.deb` (Debian/Ubuntu), `.rpm` (Fedora/openSUSE), AppImage (anything else)'
+            echo '- Arch: the `.pkg.tar.zst` below, or `makepkg -si` from a clone.'
+            echo 'Needs `webkit2gtk-4.1`.'
+            echo 'EOF_NOTES'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libgtk-3-dev libssl-dev libxdo-dev patchelf rpm
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NO_STRIP: "1"
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Lurkly ${{ github.ref_name }}
+          releaseBody: ${{ steps.body.outputs.body }}
+          releaseDraft: false
+          prerelease: false
+
+  arch:
+    name: Arch package
+    needs: bundles
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install tooling
+        run: pacman -Syu --noconfirm base-devel git rust webkit2gtk-4.1 gtk3 github-cli
+      - uses: actions/checkout@v4
+      - name: Build package as an unprivileged user
+        run: |
+          useradd -m builder
+          chown -R builder .
+          su builder -c 'makepkg -f --noconfirm'
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global --add safe.directory "$PWD"
+          gh release upload "$GITHUB_REF_NAME" ./*.pkg.tar.zst --clobber

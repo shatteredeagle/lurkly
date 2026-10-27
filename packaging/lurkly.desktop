@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Lurkly
+Comment=Minimal Twitch window with a tab per live followed channel
+Exec=lurkly
+Icon=lurkly
+Categories=AudioVideo;Network;
+StartupWMClass=lurkly
+StartupNotify=false

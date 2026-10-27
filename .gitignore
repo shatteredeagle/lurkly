@@ -1,2 +1,6 @@
 target/
 spike/dist/node_modules
+src-tauri/gen/
+*.pkg.tar.zst
+/src/
+/pkg/

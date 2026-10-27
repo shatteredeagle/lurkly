@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#26242f"/>
+      <stop offset="1" stop-color="#1c1b23"/>
+    </linearGradient>
+    <radialGradient id="iris" cx="0.4" cy="0.35" r="0.8">
+      <stop offset="0" stop-color="#c9a6ff"/>
+      <stop offset="1" stop-color="#a970ff"/>
+    </radialGradient>
+    <clipPath id="eye"><path d="M96 276 Q256 130 416 276 Q256 372 96 276 Z"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- window frame -->
+  <rect x="64" y="96" width="384" height="320" rx="36" fill="none" stroke="#a970ff" stroke-width="20"/>
+  <!-- eye -->
+  <path d="M96 276 Q256 130 416 276 Q256 372 96 276 Z" fill="#f1ebff"/>
+  <g clip-path="url(#eye)">
+    <circle cx="256" cy="268" r="62" fill="url(#iris)"/>
+    <circle cx="256" cy="268" r="26" fill="#1c1b23"/>
+    <circle cx="238" cy="250" r="12" fill="#fff" opacity="0.9"/>
+    <!-- heavy lid: lurking half-lidded look -->
+    <path d="M60 200 L452 200 L452 236 Q256 190 60 236 Z" fill="#1c1b23"/>
+  </g>
+  <path d="M96 276 Q256 130 416 276" fill="none" stroke="#a970ff" stroke-width="14" stroke-linecap="round"/>
+  <!-- live dot -->
+  <circle cx="392" cy="128" r="17" fill="#ff5a7a"/>
+</svg>
