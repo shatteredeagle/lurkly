@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 First release.
 
 ### Added
+- A pause symbol (two bars) in the middle of a cell while its video is paused.
 - Drag tabs along the bar to reorder them; the order is remembered between launches.
 - Windows builds: a per-user NSIS installer (`-setup.exe`) and a portable exe (`-portable.exe`, keeps sign-in and settings in a `lurkly-data` folder beside it), built by CI alongside the Linux packages.
 - One tab per live followed channel.

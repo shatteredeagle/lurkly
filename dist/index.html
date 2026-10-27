@@ -125,6 +125,9 @@ html,body{background:transparent}
 .cell{position:relative;overflow:hidden;background:var(--stage);min-width:0;min-height:0}
 .cell .pl{position:absolute;inset:0}
 .cell .shield{position:absolute;inset:0;z-index:2;cursor:default}
+.cell .pz{position:absolute;left:50%;top:50%;width:68px;height:68px;margin:-34px 0 0 -34px;display:none;gap:9px;align-items:center;justify-content:center;border-radius:50%;background:rgba(0,0,0,.5);backdrop-filter:blur(6px);z-index:3;pointer-events:none}
+.cell .pz i{width:9px;height:28px;border-radius:2px;background:#fff}
+.cell.paused .pz{display:flex;animation:pop .15s ease-out}
 .cell .lbl{position:absolute;left:8px;top:8px;z-index:3;padding:2px 9px;border-radius:10px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;font-weight:650;backdrop-filter:blur(6px);display:none;pointer-events:none}
 #grid.multi .lbl:not(:empty){display:block}
 #grid.multi .cell.focus::after{content:"";position:absolute;inset:0;border:2px solid var(--acc);z-index:4;pointer-events:none}
@@ -269,13 +272,13 @@ function renderGrid(){
   while(g.children.length>n){g.lastChild.remove();players.pop()}
   for(let i=0;i<n;i++){
     let el=g.children[i];
-    if(!el){el=document.createElement("div");el.className="cell";el.innerHTML='<div class="pl"></div><div class="shield"></div><span class="lbl"></span><div class="dz"></div><button class="pick" title="Choose channel"><svg viewBox="0 0 16 16"><path d="M3 5.5h9l-2.5-2.5M13 10.5H4l2.5 2.5"/></svg></button>';wireCell(el,i);g.appendChild(el)}
+    if(!el){el=document.createElement("div");el.className="cell";el.innerHTML='<div class="pl"></div><div class="shield"></div><span class="lbl"></span><div class="pz"><i></i><i></i></div><div class="dz"></div><button class="pick" title="Choose channel"><svg viewBox="0 0 16 16"><path d="M3 5.5h9l-2.5-2.5M13 10.5H4l2.5 2.5"/></svg></button>';wireCell(el,i);g.appendChild(el)}
     el.classList.toggle("focus",i===focus);
     const login=cells[i]||"";
     if(el.dataset.login!==login){
-      el.dataset.login=login;el.classList.toggle("blank",!login);players[i]=null;
+      el.dataset.login=login;el.classList.toggle("blank",!login);el.classList.remove("paused");players[i]=null;
       const pl=el.querySelector(".pl");pl.innerHTML="";
-      if(login){pl.id="pl"+i+"_"+Date.now();players[i]=new Twitch.Player(pl.id,{channel:login,parent:["localhost"],autoplay:true,muted:i!==focus||userMuted,controls:false,width:"100%",height:"100%"});players[i].addEventListener(Twitch.Player.READY,applyAudio)}
+      if(login){pl.id="pl"+i+"_"+Date.now();players[i]=new Twitch.Player(pl.id,{channel:login,parent:["localhost"],autoplay:true,muted:i!==focus||userMuted,controls:false,width:"100%",height:"100%"});const pi=players[i];pi.addEventListener(Twitch.Player.READY,applyAudio);pi.addEventListener(Twitch.Player.PAUSE,()=>el.classList.add("paused"));[Twitch.Player.PLAY,Twitch.Player.PLAYING].forEach(ev=>pi.addEventListener(ev,()=>el.classList.remove("paused")))}
     }
     const c=live.find(x=>x.login===login);el.querySelector(".lbl").textContent=c?c.name:"";
   }
