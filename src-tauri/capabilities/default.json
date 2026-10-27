@@ -1,8 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "windows": ["main"],
-  "remote": { "urls": ["http://localhost:14321/*"] },
+  "windows": [
+    "main"
+  ],
+  "remote": {
+    "urls": [
+      "http://localhost:14321/*"
+    ]
+  },
   "permissions": [
     "core:default",
     "core:window:allow-minimize",
@@ -17,8 +23,16 @@
     "allow-auth-poll",
     "allow-auth-status",
     "allow-logout",
-    "allow-live-follows",
     "allow-check-update",
-    "allow-open-release"
+    "allow-open-release",
+    "allow-get-live",
+    "allow-refresh-now",
+    "allow-take-pending-open",
+    "allow-get-alerts",
+    "allow-set-alerts-global",
+    "allow-snooze-alerts",
+    "allow-set-channel-alert",
+    "allow-set-autostart",
+    "allow-followed-channels"
   ]
 }

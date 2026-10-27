@@ -7,7 +7,7 @@ pkgdesc='Minimal Twitch window with a tab per live followed channel'
 arch=(x86_64 aarch64)
 license=(AGPL-3.0-or-later)
 url=https://github.com/shatteredeagle/lurkly
-depends=(webkit2gtk-4.1 gtk3)
+depends=(webkit2gtk-4.1 libayatana-appindicator gtk3)
 makedepends=(rust)
 options=(!lto)
 
