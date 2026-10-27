@@ -66,7 +66,7 @@ Download a package from the [latest release](../../releases/latest):
 | Fedora, openSUSE | `.rpm` |
 | Arch | `.pkg.tar.zst`, or `makepkg -si` from a clone |
 | Anything else | `.AppImage` |
-| Windows 10 / 11 | `-setup.exe` (per-user installer) or `-portable.exe` (no install; keeps its data in a `lurkly-data` folder beside the exe). Both are unsigned, so SmartScreen may ask you to confirm. |
+| Windows 10 / 11 | `-setup.exe` (per-user installer) or `-portable.exe` (no install; keeps its data in a `lurkly-data` folder beside the exe, or in your normal user folder if the exe sits somewhere read-only). Both are unsigned, so SmartScreen may ask you to confirm. |
 
 On Linux the runtime needs `webkit2gtk-4.1` and `gtk3`. On Windows it uses the WebView2 runtime that ships with Windows 11 (the installer fetches it on Windows 10). Linux (KDE Plasma, Wayland) is the tested platform; the Windows build is produced by CI and has had less testing.
 

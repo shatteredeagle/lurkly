@@ -38,12 +38,29 @@ struct AppState {
 
 /// Portable mode: the exe is named "...portable..." or sits next to a `lurkly.portable` file. Everything
 /// (tokens, webview cookies and storage) then lives in `lurkly-data/` beside the exe instead of the user profile.
+/// If that folder can't be written (exe in a read-only place), fall back to the normal per-user folders.
 fn portable_dir() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let dir = exe.parent()?;
     let name = exe.file_stem()?.to_string_lossy().to_lowercase();
-    (name.contains("portable") || dir.join("lurkly.portable").exists())
-        .then(|| dir.join("lurkly-data"))
+    if !(name.contains("portable") || dir.join("lurkly.portable").exists()) {
+        return None;
+    }
+    let data = dir.join("lurkly-data");
+    let probe = data.join(".write-test");
+    let writable = fs::create_dir_all(&data)
+        .and_then(|_| fs::write(&probe, b""))
+        .is_ok();
+    let _ = fs::remove_file(&probe);
+    if writable {
+        Some(data)
+    } else {
+        eprintln!(
+            "lurkly: {} is not writable, using the user profile instead",
+            dir.display()
+        );
+        None
+    }
 }
 
 fn now() -> u64 {
