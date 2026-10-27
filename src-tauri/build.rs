@@ -6,6 +6,8 @@ fn main() {
             "auth_status",
             "logout",
             "live_follows",
+            "check_update",
+            "open_release",
         ]),
     ))
     .expect("failed to run tauri-build");

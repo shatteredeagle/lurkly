@@ -5,6 +5,9 @@ use std::{
     sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
 };
+mod update;
+
+use tauri_plugin_opener::OpenerExt;
 use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 const PORT: u16 = 14321;
@@ -278,6 +281,35 @@ async fn live_follows(state: State<'_, AppState>) -> Result<Vec<Live>, String> {
     Ok(live)
 }
 
+#[derive(Serialize)]
+struct UpdateInfo {
+    current: String,
+    latest: Option<String>,
+    url: Option<String>,
+    newer: bool,
+}
+
+/// Notify-only: compares against the latest GitHub release. Package-managed installs update via their package manager.
+#[tauri::command]
+async fn check_update(state: State<'_, AppState>) -> Result<UpdateInfo, String> {
+    let rel = update::latest(&state.http).await?;
+    let newer = rel.as_ref().is_some_and(|r| update::is_newer(update::CURRENT, &r.version));
+    Ok(UpdateInfo {
+        current: update::CURRENT.to_string(),
+        latest: rel.as_ref().map(|r| r.version.clone()),
+        url: rel.map(|r| r.url),
+        newer,
+    })
+}
+
+#[tauri::command]
+fn open_release(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    if !url.starts_with(concat!(env!("CARGO_PKG_REPOSITORY"), "/releases")) {
+        return Err("unexpected URL".into());
+    }
+    app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
@@ -286,8 +318,9 @@ fn main() {
                 let _ = w.set_focus();
             }
         }))
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_localhost::Builder::new(PORT).build())
-        .invoke_handler(tauri::generate_handler![auth_start, auth_poll, auth_status, logout, live_follows])
+        .invoke_handler(tauri::generate_handler![auth_start, auth_poll, auth_status, logout, live_follows, check_update, open_release])
         .setup(|app| {
             let path = app.path().app_config_dir()?.join("auth.json");
             let auth = fs::read_to_string(&path).ok().and_then(|s| serde_json::from_str(&s).ok());

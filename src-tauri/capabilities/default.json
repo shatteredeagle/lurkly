@@ -16,6 +16,8 @@
     "allow-auth-poll",
     "allow-auth-status",
     "allow-logout",
-    "allow-live-follows"
+    "allow-live-follows",
+    "allow-check-update",
+    "allow-open-release"
   ]
 }
