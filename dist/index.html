@@ -390,6 +390,7 @@ function mountChat(){
   let fr=$("chatFrame");if(!fr){fr=document.createElement("div");fr.id="chatFrame";fr.style.cssText="flex:1;display:flex;min-width:0";$("chatBox").appendChild(fr)}
   if(on&&lk){fr.innerHTML="";LurklyChat.show(c.login)}
   else{if(window.LurklyChat)LurklyChat.hide();fr.innerHTML=on?`<iframe src="https://www.twitch.tv/embed/${encodeURIComponent(c.login)}/chat?parent=localhost${dark()?"&darkpopout":""}"></iframe>`:""}
+  fr.style.display=lk?"none":"flex";
   chatTitle(c);
 }
 function select(login){
