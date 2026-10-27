@@ -12,7 +12,7 @@ use tauri_plugin_opener::OpenerExt;
 
 const PORT: u16 = 14321;
 /// Public Twitch app (device-code flow, no secret). Not a secret.
-const CLIENT_ID: &str = "fbdqr3633wqkdt92v0lvqw8b7shic2";
+const CLIENT_ID: &str = "ap8s9pd08i44xgsm2eumg6oxotptcs";
 const SCOPE: &str = "user:read:follows";
 
 #[derive(Serialize, Deserialize, Clone)]
