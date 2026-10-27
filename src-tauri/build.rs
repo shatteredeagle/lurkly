@@ -17,6 +17,11 @@ fn main() {
             "followed_channels",
             "check_update",
             "open_release",
+            "chat_status",
+            "chat_join",
+            "chat_leave",
+            "chat_send",
+            "chat_emotes",
         ]),
     ))
     .expect("failed to run tauri-build");

@@ -190,7 +190,8 @@ body.fs .av::after{border-color:transparent}
 body.fs .fade.l{background:linear-gradient(90deg,rgba(14,13,19,.8),transparent)}body.fs .fade.r{background:linear-gradient(270deg,rgba(14,13,19,.8),transparent)}
 body.fs.idle .bar{opacity:0;transform:translateY(-100%);pointer-events:none}
 body.fs.idle,body.fs.idle #shield{cursor:none}
-</style></head>
+</style>
+<link rel="stylesheet" href="chat.css"></head>
 <body>
 <div class="win" id="win">
   <header class="bar" id="bar">
@@ -234,6 +235,7 @@ body.fs.idle,body.fs.idle #shield{cursor:none}
     <div class="acct"><div style="flex:1"><b id="acctName">-</b><small style="display:block;color:var(--mut);font-size:11px">Signed in with Twitch</small></div><button class="link" id="signOut">Sign out</button></div>
     <div class="hr"></div>
     <div class="row"><span>Theme</span><div class="seg" id="themeSeg"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
+    <div class="row"><span>Chat</span><div class="seg" id="chatSeg"><button data-m="lurkly">Lurkly</button><button data-m="twitch">Twitch</button></div></div>
     <div class="row"><span id="verT">Lurkly</span><button class="link" id="verBtn">Check for updates</button></div>
     <div class="row"><span>Check for updates daily</span><div class="sw on" id="sw5"></div></div>
     <div class="row"><span>Always on top<small>Pairs with mini mode</small></span><div class="sw" id="sw3"></div></div>
@@ -243,6 +245,7 @@ body.fs.idle,body.fs.idle #shield{cursor:none}
   <div id="ins"></div>
 </div>
 <script src="https://player.twitch.tv/js/embed/v1.js"></script>
+<script src="chat.js"></script>
 <script>
 const $=id=>document.getElementById(id), T=window.__TAURI__, inv=(c,a)=>T.core.invoke(c,a), W=T.window.getCurrentWindow();
 const store=(k,v)=>{try{if(v===undefined)return localStorage.getItem("lurkly."+k);localStorage.setItem("lurkly."+k,v)}catch(e){return null}};
@@ -376,12 +379,18 @@ function setLayout(l){
 function buildLayouts(){const m=$("layoutPop");m.innerHTML=LAYOUTS.map(([l,name])=>{const [C,R]=l.split("x").map(Number);
   return `<button class="lo ${l===layout?"on":""}" data-l="${l}"><span class="th" style="grid-template-columns:repeat(${C},1fr);grid-template-rows:repeat(${R},1fr)">${"<i></i>".repeat(C*R)}</span>${name}<small>${C}×${R}</small></button>`}).join("");
   m.querySelectorAll(".lo").forEach(b=>b.onclick=()=>setLayout(b.dataset.l))}
-let chatKey="";
+let chatKey="", chatMode=store("chatmode")==="twitch"?"twitch":"lurkly", chatStates={};
+if(window.LurklyChat)LurklyChat.init({box:$("chatBox"),inv,listen:(n,f)=>T.event.listen(n,f),theme:()=>document.documentElement.dataset.theme,
+ onNeedSignIn:async()=>{await inv("logout").catch(()=>{});reset();showLogin()},toast,
+ onState:(l,s)=>{chatStates[l]=s;if(l===cur)chatTitle(live.find(x=>x.login===cur))}});
+function chatTitle(c){const s=c&&chatMode==="lurkly"?chatStates[c.login]:"";$("chatT").textContent=c?"Chat · "+c.name+(s&&s!=="live"?" ("+s+")":""):"Chat"}
 function mountChat(){
-  const c=live.find(x=>x.login===cur);
-  const key=(c&&chatOn?c.login:"")+"|"+dark();if(key===chatKey){$("chatT").textContent=c?"Chat · "+c.name:"Chat";return}chatKey=key;
-  $("chatBox").innerHTML=c&&chatOn?`<iframe src="https://www.twitch.tv/embed/${encodeURIComponent(c.login)}/chat?parent=localhost${dark()?"&darkpopout":""}"></iframe>`:"";
-  $("chatT").textContent=c?"Chat · "+c.name:"Chat";
+  const c=live.find(x=>x.login===cur), on=!!(c&&chatOn), lk=chatMode==="lurkly"&&!!window.LurklyChat;
+  const key=(on?c.login:"")+"|"+(lk?"lurkly":"twitch"+dark());if(key===chatKey){chatTitle(c);return}chatKey=key;
+  let fr=$("chatFrame");if(!fr){fr=document.createElement("div");fr.id="chatFrame";fr.style.cssText="flex:1;display:flex;min-width:0";$("chatBox").appendChild(fr)}
+  if(on&&lk){fr.innerHTML="";LurklyChat.show(c.login)}
+  else{if(window.LurklyChat)LurklyChat.hide();fr.innerHTML=on?`<iframe src="https://www.twitch.tv/embed/${encodeURIComponent(c.login)}/chat?parent=localhost${dark()?"&darkpopout":""}"></iframe>`:""}
+  chatTitle(c);
 }
 function select(login){
   const i=cells.indexOf(login);if(i>=0)focus=i;else cells[focus]=login;
@@ -441,9 +450,12 @@ $("sw5").onclick=()=>{autoUpd=$("sw5").classList.toggle("on");store("autoupd",au
 setTimeout(()=>{if(autoUpd)checkUpdate(false)},5000);
 setInterval(()=>{if(autoUpd)checkUpdate(false)},24*3600*1000);
 const mq=matchMedia("(prefers-color-scheme: dark)");
-function theme(t){store("theme",t);const d=t==="auto"?mq.matches:t==="dark";document.documentElement.dataset.theme=d?"dark":"light";document.querySelectorAll("#themeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));if(cur&&chatOn)mountChat()}
+function theme(t){store("theme",t);const d=t==="auto"?mq.matches:t==="dark";document.documentElement.dataset.theme=d?"dark":"light";document.querySelectorAll("#themeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));if(window.LurklyChat)LurklyChat.refreshTheme();if(cur&&chatOn)mountChat()}
 document.querySelectorAll("#themeSeg button").forEach(b=>b.onclick=()=>theme(b.dataset.t));
 theme(store("theme")||"auto");
+function setChatMode(m){chatMode=m;store("chatmode",m);document.querySelectorAll("#chatSeg button").forEach(b=>b.classList.toggle("on",b.dataset.m===m));mountChat()}
+document.querySelectorAll("#chatSeg button").forEach(b=>b.onclick=()=>setChatMode(b.dataset.m));
+document.querySelectorAll("#chatSeg button").forEach(b=>b.classList.toggle("on",b.dataset.m===chatMode));
 /* keys */
 addEventListener("keydown",e=>{if(e.altKey||e.metaKey||e.target.closest("input,textarea,[contenteditable]"))return;const k=e.key.length===1?e.key.toLowerCase():e.key;if(e.repeat&&!k.startsWith("Arrow"))return;
  if(k==="c"&&!e.ctrlKey)setChat(!chatOn);else if(e.ctrlKey&&k==="k"){e.preventDefault();$("more").click()}

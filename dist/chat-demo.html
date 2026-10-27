@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lurkly chat demo</title>
+<link rel="stylesheet" href="chat.css">
+<style>
+:root{--bg:#f4f3f7;--chrome:#ebe9f1;--fg:#1c1a24;--mut:#7a7689;--card:#fff;--bd:#d9d6e3;--acc:#7c3aed;--acc-fg:#fff;--acc-soft:rgba(124,58,237,.12);--live:#e5324b;--danger:#b3261e;--hover:rgba(28,26,36,.07);--shadow:0 10px 30px rgba(30,20,60,.18);--r:6px;color-scheme:light}
+:root[data-theme=dark]{--bg:#141318;--chrome:#0f0e13;--fg:#ecebf2;--mut:#8d89a0;--card:#1c1b23;--bd:#2b2935;--acc:#a970ff;--acc-fg:#14101c;--acc-soft:rgba(169,112,255,.16);--live:#ff4d67;--danger:#f2766e;--hover:rgba(255,255,255,.06);--shadow:0 12px 34px rgba(0,0,0,.55);color-scheme:dark}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--chrome);color:var(--fg);font:13px/1.35 system-ui,sans-serif;display:flex}
+.stage{flex:1;padding:14px;color:var(--mut);font-size:12px;display:flex;flex-direction:column;gap:8px}
+.stage button{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:3px 9px;cursor:pointer;margin:0 3px 3px 0}
+body.shot .stage{display:none}
+.chat{width:var(--w,340px);flex:none;display:flex;flex-direction:column;background:var(--bg);border-left:1px solid var(--bd)}
+.chat-h{height:30px;flex:none;display:flex;align-items:center;padding:0 12px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:650;color:var(--mut);border-bottom:1px solid var(--bd)}
+body.shot .chat{margin-left:auto}
+</style></head><body>
+<div class="stage"><b>Lurkly chat demo (mock backend)</b>
+<div id="ctl"></div><div id="log"></div></div>
+<aside class="chat" id="chat"><div class="chat-h"><span id="chatT">Chat</span></div><div id="chatBox" style="flex:1;display:flex;min-height:0"></div></aside>
+<script src="chat.js"></script>
+<script>
+const Q=new URLSearchParams(location.search);
+document.documentElement.dataset.theme=Q.get("theme")||"dark";
+if(Q.get("shot"))document.body.classList.add("shot");
+document.documentElement.style.setProperty("--w",(Q.get("w")||340)+"px");
+/* ---- fake art ---- */
+const art=(t,c,w=28,h=28)=>"data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" rx="${h/5}" fill="${c}"/><text x="${w/2}" y="${h/2+3}" font-family="sans-serif" font-size="${t.length>5?7:10}" font-weight="700" fill="#fff" text-anchor="middle">${t}</text></svg>`);
+const ovl=(c)=>"data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="12" fill="none" stroke="${c}" stroke-width="3" stroke-dasharray="4 3"/></svg>`);
+const TWE={25:["Kappa","#c47"],1902:["Kreygasm","#3a7"],305954156:["PogChamp","#27c"],86:["BibleThump","#c72"]};
+const third=[
+ {n:"KEKW",u:art("KEKW","#e0a000",40),src:"7tv",scope:"channel",zw:false},
+ {n:"OMEGALUL",u:art("OMG","#2a9",40),src:"bttv",scope:"channel",zw:false},
+ {n:"monkaS",u:art("monkaS","#585",40),src:"ffz",scope:"channel",zw:false},
+ {n:"Sadge",u:art("Sadge","#468"),src:"7tv",scope:"global",zw:false},
+ {n:"RainbowPls",u:art("RPls","#a4c"),src:"bttv",scope:"global",zw:false},
+ {n:"cvMask",u:ovl("#f55"),src:"7tv",scope:"global",zw:true},
+ {n:"SoSnowy",u:ovl("#5cf"),src:"bttv",scope:"global",zw:true}
+];
+for(let i=0;i<120;i++)third.push({n:"Emote"+i,u:art("E"+i,["#d33","#39d","#3a6","#a63"][i%4]),src:["7tv","bttv","ffz"][i%3],scope:"channel",zw:false});
+const EM={user_id:"1",badges:{"subscriber/12":art("S12","#8a4bff",14,14),"moderator/1":art("M","#00a35a",14,14),"broadcaster/1":art("B","#e91916",14,14)},third,
+ twitch:Object.entries(TWE).map(([id,[n]])=>({id,n,scope:id==25?"global":"channel"}))};
+/* ---- mock tauri ---- */
+const handlers={};let scope=Q.get("scope")!=="0";
+const emit=items=>(handlers["chat-batch"]||[]).forEach(f=>f({payload:items}));
+let sendFail=0;
+window.__TAURI__={core:{invoke:async(c,a)=>{
+  log(c+" "+JSON.stringify(a||{}));
+  if(c==="chat_status")return {has_scope:scope,me:{id:"9",login:"jesse",name:"Jesse"}};
+  if(c==="chat_emotes")return EM;
+  if(c==="chat_join"){const ch=a.login;setTimeout(()=>emit([{t:"status",ch,state:Q.get("state")==="connecting"?"connecting":"live"},{t:"room",ch,slow:Q.get("room")?30:0,followers:Q.get("room")?10:-1,subs:!!Q.get("room"),emote_only:false}]),Q.get("state")==="connecting"?60000:200);return}
+  if(c==="chat_send"){if(a.text.includes("fail")||(++sendFail%4===0))throw "Slow mode: wait 5 s";setTimeout(()=>emit([msg(a.login,"jesse","Jesse","#1E90FF",a.text,a.replyTo?{id:a.replyTo,login:"x",name:"x",text:"..."}:null,{self:true})]),100);return}
+  return null;
+}},event:{listen:async(n,f)=>{(handlers[n]=handlers[n]||[]).push(f);return()=>{}}}};
+function log(t){const l=document.getElementById("log");if(l){l.textContent=(t+"\n"+l.textContent).slice(0,900);l.style.whiteSpace="pre-wrap"}}
+let seq=0;
+function toFrags(text){const f=[];for(const w of text.split(/(\s+)/)){if(!w)continue;const e=Object.entries(TWE).find(([id,[n]])=>n===w);
+  if(e)f.push({k:"e",id:e[0],v:w});else if(/^@/.test(w))f.push({k:"m",v:w});else if(/^cheer\d+/.test(w))f.push({k:"c",v:w});else f.push({k:"t",v:w})}return f}
+function msg(ch,login,name,color,text,reply,o={}){return Object.assign({t:"msg",ch,id:"m"+(++seq),uid:"u_"+login,login,name,color,badges:[],frags:toFrags(text),reply:reply||null,first:false,self:false,action:false,hl:false,ts:Date.now()},o)}
+/* ---- init chat ---- */
+let sign=0;
+LurklyChat.init({box:document.getElementById("chatBox"),inv:window.__TAURI__.core.invoke,listen:window.__TAURI__.event.listen,
+  theme:()=>document.documentElement.dataset.theme,onNeedSignIn:()=>{scope=true;sign++;log("onNeedSignIn -> scope granted");LurklyChat.show("bobross")},toast:t=>log("toast: "+t),
+  twitchEmote:id=>art(TWE[id]?TWE[id][0]:"?",TWE[id]?TWE[id][1]:"#888",36,28),
+  onState:(l,s)=>{document.getElementById("chatT").textContent="Chat · "+l+(s==="live"?"":" ("+s+")")}});
+if(Q.get("density"))LurklyChat.setPrefs({density:Q.get("density")});
+LurklyChat.setPrefs({timestamps:Q.get("ts")!=="0",badges:true});
+LurklyChat.show("bobross");
+/* ---- scripted stream ---- */
+const U=[["alice","Alice","#FF4500",[{s:"subscriber",v:"12"}]],["bob","Bob_the_Mod","#0000FF",[{s:"moderator",v:"1"},{s:"subscriber",v:"12"}]],["carol","carol","#00FF7F",[]],["dave","Dave","",[{s:"broadcaster",v:"1"}]],["eve","Eve","#8A2BE2",[]],["frank","Frank","#1E1E1E",[]]];
+const LINES=["hello chat Kappa","KEKW that was great","Kreygasm OMEGALUL monkaS","Sadge cvMask","RainbowPls RainbowPls RainbowPls","SoSnowy first emote overlay with nothing before","nice play @jesse good one","@jesse are you there?","this is a really long message that should wrap around nicely under the start of the line and not break anything even with averyveryveryveryveryverylongwordthatneedstobreakproperly","cheer100 thanks for the stream","<scr"+"ipt>alert(1)</scr"+"ipt> & \"quotes\" are escaped","Emote1 Emote2 Emote3 Emote4 Emote5 Emote6 Emote7 Emote8"];
+let n=0;function tick(k=1){const out=[];for(let i=0;i<k;i++){const u=U[n%U.length],t=LINES[(n*7)%LINES.length];out.push(msg("bobross",u[0],u[1],u[2],t,null,{badges:u[3],hl:/@jesse/.test(t),first:n%17===5,action:n%13===9}));n++}emit(out);return out}
+const ids=[];
+function script(){
+  const a=msg("bobross","alice","Alice","#FF4500","welcome to the stream Kappa",null,{badges:U[0][3]});
+  const b=msg("bobross","bob","Bob_the_Mod","#0000FF","Kreygasm KEKW cvMask stacked overlay test",null,{badges:U[1][3]});
+  const c=msg("bobross","carol","carol","#00FF7F","@Alice yes it is! OMEGALUL",{id:a.id,login:"alice",name:"Alice",text:"welcome to the stream Kappa"});
+  const d=msg("bobross","eve","Eve","#8A2BE2","this one will be deleted soon");
+  const act=msg("bobross","frank","Frank","#1E1E1E","waves at chat",null,{action:true});
+  const hl=msg("bobross","dave","Dave","","@jesse welcome back PogChamp",null,{hl:true,badges:U[3][3],first:true});
+  emit([a,b,c,d,act,hl,{t:"notice",ch:"bobross",kind:"sub",text:"Zed subscribed with Prime. They've subscribed for 3 months!"},{t:"notice",ch:"bobross",kind:"raid",text:"42 raiders from Someone have joined!"},msg("bobross","eve","Eve","#8A2BE2","bad words here",null,{})]);
+  setTimeout(()=>{emit([{t:"del",ch:"bobross",id:d.id}])},300);
+  setTimeout(()=>{const x=tick(1)[0];emit([{t:"clear",ch:"bobross",uid:"u_eve"}])},500);
+  for(let i=0;i<30;i++)tick(2);
+}
+script();
+const mode=Q.get("mode")||"";
+if(mode==="live"){setInterval(()=>tick(2),400)}
+if(Q.get("pause")){setTimeout(()=>{const l=document.querySelector(".lc-list:not(.off)");l.scrollTop=40;l.dispatchEvent(new Event("scroll"));tick(5);},600)}
+if(Q.get("open")==="picker"){setTimeout(()=>{document.querySelector(".lc-inp button").click();const s=Q.get("q");if(s){const i=document.querySelector(".lc-search input");i.value=s;i.dispatchEvent(new Event("input"))}},700)}
+if(Q.get("draft")){setTimeout(()=>{const i=document.querySelector(".lc-inp input");i.focus();i.value=Q.get("draft");i.setSelectionRange(i.value.length,i.value.length);i.dispatchEvent(new Event("input"))},700)}
+if(Q.get("reply")){setTimeout(()=>{const r=document.querySelectorAll(".lc-list:not(.off) .m")[2];r.querySelector('[data-a=reply]').click();document.querySelector(".lc-inp input").value="thanks ";document.querySelector(".lc-inp input").dispatchEvent(new Event("input"));if(Q.get("err")){document.querySelector(".lc-inp input").value="please fail";document.querySelector(".lc-send").disabled=false;document.querySelector(".lc-send").click()}},700)}
+if(Q.get("status")){setTimeout(()=>emit([{t:"status",ch:"bobross",state:Q.get("status"),msg:Q.get("status")==="error"?"Can't reach chat.":""}]),700)}
+/* ---- controls ---- */
+const ctl=document.getElementById("ctl");
+const B=(t,f)=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;ctl.appendChild(b)};
+B("burst x40",()=>{for(let i=0;i<20;i++)tick(2)});B("live stream",()=>setInterval(()=>tick(2),300));
+B("reconnecting",()=>emit([{t:"status",ch:"bobross",state:"reconnecting"}]));B("error",()=>emit([{t:"status",ch:"bobross",state:"error",msg:"Can't reach chat."}]));
+B("live",()=>emit([{t:"status",ch:"bobross",state:"live"}]));B("no-scope",()=>emit([{t:"status",ch:"bobross",state:"no-scope"}]));
+B("room chips",()=>emit([{t:"room",ch:"bobross",slow:30,followers:10,subs:true,emote_only:true}]));
+B("clear chat",()=>emit([{t:"clear",ch:"bobross",uid:null}]));B("channel 2",()=>LurklyChat.show("other"));B("channel 1",()=>LurklyChat.show("bobross"));
+B("theme",()=>{const d=document.documentElement.dataset;d.theme=d.theme==="dark"?"light":"dark";LurklyChat.refreshTheme()});
+B("hide",()=>LurklyChat.hide());
+</script>
+</body></html>

@@ -8,6 +8,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 mod alerts;
+mod chat;
+mod emotes;
 mod update;
 
 use std::collections::{HashMap, HashSet};
@@ -22,7 +24,7 @@ use tauri_plugin_opener::OpenerExt;
 const PORT: u16 = 14321;
 /// Public Twitch app (device-code flow, no secret). Not a secret.
 const CLIENT_ID: &str = "ap8s9pd08i44xgsm2eumg6oxotptcs";
-const SCOPE: &str = "user:read:follows";
+const SCOPE: &str = "user:read:follows user:read:chat user:write:chat";
 
 #[derive(Serialize, Deserialize, Clone)]
 struct Auth {
@@ -56,6 +58,7 @@ struct AppState {
     tray_ok: AtomicBool,
     quitting: AtomicBool,
     err_notified: AtomicBool,
+    chat: chat::Chat,
 }
 
 /// Portable mode: the exe is named "...portable..." or sits next to a `lurkly.portable` file. Everything
@@ -809,6 +812,44 @@ async fn helix_get(
     Err("auth".into())
 }
 
+/// A Helix request with an optional JSON body (chat: POST/DELETE); refreshes the token once on 401.
+/// Returns the status and parsed body for any non-401 answer (callers map Helix error messages themselves).
+async fn helix_send(
+    state: &AppState,
+    method: reqwest::Method,
+    path: &str,
+    query: &[(&str, &str)],
+    body: Option<&serde_json::Value>,
+) -> Result<(u16, serde_json::Value), String> {
+    let mut a = state.auth.lock().unwrap().clone().ok_or("auth")?;
+    if a.expires_at < now() + 60 {
+        a = refresh(state, &a.access).await?;
+    }
+    for attempt in 0..2 {
+        let mut req = state
+            .http
+            .request(
+                method.clone(),
+                format!("https://api.twitch.tv/helix/{path}"),
+            )
+            .query(query)
+            .header("Client-Id", CLIENT_ID)
+            .bearer_auth(&a.access);
+        if let Some(b) = body {
+            req = req.json(b);
+        }
+        let res = req.send().await.map_err(|e| e.to_string())?;
+        let code = res.status().as_u16();
+        if code == 401 && attempt == 0 {
+            a = refresh(state, &a.access).await?;
+            continue;
+        }
+        let text = res.text().await.unwrap_or_default();
+        return Ok((code, serde_json::from_str(&text).unwrap_or_default()));
+    }
+    Err("auth".into())
+}
+
 /// Every channel the user follows (live ones first), for the alerts list.
 #[tauri::command]
 async fn followed_channels(state: State<'_, AppState>) -> Result<Vec<Followed>, String> {
@@ -933,7 +974,12 @@ fn main() {
             set_autostart,
             followed_channels,
             check_update,
-            open_release
+            open_release,
+            chat::chat_status,
+            chat::chat_join,
+            chat::chat_leave,
+            chat::chat_send,
+            chat::chat_emotes
         ])
         .setup(|app| {
             // The UI is served from localhost:PORT; if something else owns the port the window would show that instead.
@@ -980,6 +1026,7 @@ fn main() {
                 tray_ok: AtomicBool::new(false),
                 quitting: AtomicBool::new(false),
                 err_notified: AtomicBool::new(false),
+                chat: chat::Chat::default(),
             });
 
             // a click on a go-live notification opens that channel

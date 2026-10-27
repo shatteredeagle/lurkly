@@ -34,6 +34,11 @@
     "allow-set-channel-alert",
     "allow-set-autostart",
     "allow-followed-channels",
-    "allow-test-alert"
+    "allow-test-alert",
+    "allow-chat-status",
+    "allow-chat-join",
+    "allow-chat-leave",
+    "allow-chat-send",
+    "allow-chat-emotes"
   ]
 }
