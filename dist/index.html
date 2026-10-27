@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lurkly</title>
+<style>
+:root{
+  --bg:#f4f3f7; --chrome:#ebe9f1; --fg:#1c1a24; --mut:#7a7689; --card:#fff; --bd:#d9d6e3;
+  --acc:#7c3aed; --acc-fg:#fff; --acc-soft:rgba(124,58,237,.12); --live:#e5324b; --danger:#b3261e;
+  --stage:#0c0b10; --hover:rgba(28,26,36,.07); --shadow:0 10px 30px rgba(30,20,60,.18);
+  --r:6px; --chatw:320px; color-scheme:light;
+}
+:root[data-theme=dark]{
+  --bg:#141318; --chrome:#0f0e13; --fg:#ecebf2; --mut:#8d89a0; --card:#1c1b23; --bd:#2b2935;
+  --acc:#a970ff; --acc-fg:#14101c; --acc-soft:rgba(169,112,255,.16); --live:#ff4d67; --danger:#f2766e;
+  --stage:#07060a; --hover:rgba(255,255,255,.06); --shadow:0 12px 34px rgba(0,0,0,.55); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:13px/1.35 system-ui,"Inter","Cantarell",sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+.win{position:fixed;inset:0;display:flex;flex-direction:column;border:1px solid var(--bd);border-radius:10px;overflow:hidden;background:var(--bg)}
+/* ---------- titlebar + tabs ---------- */
+.bar{height:38px;flex:none;display:flex;align-items:stretch;background:var(--chrome);border-bottom:1px solid var(--bd);-webkit-app-region:drag;position:relative}
+.brand{width:38px;display:grid;place-items:center;flex:none}
+.brand i{width:10px;height:10px;border-radius:3px;background:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+.tabs-wrap{flex:1;min-width:0;position:relative;display:flex}
+.tabsbox{position:relative;display:flex;min-width:0;flex:0 1 auto;margin-right:2px}.tabs{display:flex;align-items:flex-end;gap:2px;overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth;padding:6px 6px 0 0;flex:0 1 auto;min-width:0}
+.tabs::-webkit-scrollbar{display:none}
+.fade{position:absolute;top:0;bottom:0;width:26px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:2}
+.fade.l{left:0;background:linear-gradient(90deg,var(--chrome),transparent)}
+.fade.r{right:0;background:linear-gradient(270deg,var(--chrome),transparent)}
+.fade.on{opacity:1}
+.tab{text-align:left;-webkit-app-region:no-drag;position:relative;flex:0 0 132px;height:31px;display:flex;align-items:center;gap:7px;padding:0 8px 0 7px;border-radius:7px 7px 0 0;color:var(--mut);transition:background .15s,color .15s}
+.tab:hover{background:var(--hover);color:var(--fg)}
+.tab.active{background:var(--bg);color:var(--fg);box-shadow:inset 0 2px 0 var(--acc)}
+.tab.active::before,.tab.active::after{content:"";position:absolute;bottom:0;width:7px;height:7px;pointer-events:none}
+.av{position:relative;width:20px;height:20px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff;letter-spacing:-.02em}
+.av::after{content:"";position:absolute;right:-2px;bottom:-2px;width:8px;height:8px;border-radius:50%;background:var(--live);border:2px solid var(--chrome)}
+.tab.active .av::after{border-color:var(--bg)}
+.tab .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:550;font-size:12.5px}
+.tab .x{width:16px;height:16px;border-radius:4px;display:none;place-items:center;color:var(--mut);font-size:13px;line-height:1;flex:none}
+.tab:hover .x,.tab.active .x{display:grid}
+.tab .x:hover{background:var(--hover);color:var(--fg)}
+.tab.fresh{animation:pop .28s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes pop{from{opacity:0;transform:translateY(5px) scale(.96)}}
+.tab.offline{opacity:.55}.tab.offline .av::after{background:var(--mut)}
+.more{-webkit-app-region:no-drag;align-self:center;margin-left:2px;height:24px;padding:0 8px;border-radius:12px;display:none;align-items:center;gap:4px;font-size:11.5px;font-weight:600;color:var(--mut);background:var(--hover);flex:none}
+.more.on{display:flex}.more:hover{color:var(--fg)}
+.drag{flex:1}
+.tools{display:flex;align-items:center;gap:2px;padding:0 4px 0 6px;-webkit-app-region:no-drag}
+.ib{width:30px;height:28px;border-radius:var(--r);display:grid;place-items:center;color:var(--mut);transition:background .12s,color .12s}
+.ib:hover{background:var(--hover);color:var(--fg)}
+.ib[aria-pressed=true]{color:var(--acc);background:var(--acc-soft)}
+.ib svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.sep{width:1px;height:16px;background:var(--bd);margin:0 5px}
+.wc:hover.close{background:var(--danger);color:#fff}
+/* ---------- body ---------- */
+.main{flex:1;display:flex;min-height:0}
+.stage{flex:1;min-width:0;background:var(--stage);position:relative;overflow:hidden;margin:0}
+.video{position:absolute;inset:0;display:grid;place-items:center}
+.video .art{position:absolute;inset:0;transition:opacity .35s}
+.hud{position:absolute;left:0;right:0;bottom:0;padding:34px 14px 12px;display:flex;align-items:flex-end;gap:12px;color:#fff;background:linear-gradient(0deg,rgba(0,0,0,.72),transparent);opacity:0;transform:translateY(6px);transition:.2s;pointer-events:none}
+.stage:hover .hud{opacity:1;transform:none}
+.hud h2{margin:0;font-size:14px;font-weight:650;text-shadow:0 1px 8px rgba(0,0,0,.5)}
+.hud p{margin:2px 0 0;font-size:12px;opacity:.78}
+.hud .grow{flex:1;min-width:0}
+.pill{font-size:11px;font-weight:650;padding:3px 8px;border-radius:10px;background:rgba(255,255,255,.14);backdrop-filter:blur(8px);white-space:nowrap}
+.pill b{color:var(--live);margin-right:4px}
+.loading{position:absolute;inset:0;display:none;place-items:center;background:var(--stage);z-index:3}
+.loading.on{display:grid}
+.spin{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.14);border-top-color:var(--acc);animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.chat{width:var(--chatw);flex:none;display:flex;flex-direction:column;background:var(--bg);border-left:1px solid var(--bd);position:relative;transition:margin-right .22s cubic-bezier(.3,.8,.3,1)}
+.chat.off{margin-right:calc(var(--chatw) * -1)}
+.grip{position:absolute;left:-3px;top:0;bottom:0;width:6px;cursor:col-resize;z-index:4}
+.grip:hover,.grip.drag{background:linear-gradient(90deg,transparent 2px,var(--acc) 2px,var(--acc) 4px,transparent 4px)}
+.chat-h{height:30px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:650;color:var(--mut);border-bottom:1px solid var(--bd)}
+.msgs{flex:1;overflow:hidden;padding:8px 12px;display:flex;flex-direction:column;justify-content:flex-end;gap:5px;font-size:12.5px}
+.m{overflow-wrap:anywhere}.m b{font-weight:650;margin-right:5px}
+.m .badge{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-0.5px}
+.inp{margin:8px 10px 10px;height:34px;border-radius:var(--r);background:var(--card);border:1px solid var(--bd);display:flex;align-items:center;padding:0 10px;color:var(--mut)}
+.inp:focus-within{border-color:var(--acc)}
+.inp input{all:unset;flex:1;color:var(--fg);font-size:12.5px}
+.inp input::placeholder{color:var(--mut)}
+/* ---------- popovers ---------- */
+.pop{position:absolute;z-index:20;background:var(--card);border:1px solid var(--bd);border-radius:10px;box-shadow:var(--shadow);display:none;font-size:12.5px}
+.pop.on{display:block;animation:pop .16s ease-out}
+#menu{top:40px;left:46px;width:272px;max-height:380px;overflow:auto;padding:5px}
+.mi{display:flex;align-items:center;gap:9px;width:100%;padding:6px 8px;border-radius:6px;text-align:left}
+.mi:hover{background:var(--hover)}
+.mi .av::after{border-color:var(--card)}
+.mi .nm{flex:1;min-width:0}.mi .nm div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mi .nm small,.mi .v{color:var(--mut);font-size:11.5px}
+.mi.cur{background:var(--acc-soft)}
+#settings{top:40px;right:8px;width:268px;padding:6px}
+.row{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:6px;gap:10px}
+.row small{color:var(--mut);display:block;font-size:11px}
+.seg{display:flex;background:var(--bg);border:1px solid var(--bd);border-radius:7px;padding:2px}
+.seg button{padding:3px 9px;border-radius:5px;font-size:11.5px;color:var(--mut)}
+.seg button.on{background:var(--card);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.sw{width:32px;height:18px;border-radius:9px;background:var(--bd);position:relative;flex:none;transition:.15s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.15s}
+.sw.on{background:var(--acc)}.sw.on::after{left:16px}
+.hr{height:1px;background:var(--bd);margin:4px 6px}
+.acct{display:flex;align-items:center;gap:9px;padding:8px}
+.link{color:var(--acc);font-weight:600}
+.tip{position:absolute;z-index:30;pointer-events:none;background:var(--card);border:1px solid var(--bd);box-shadow:var(--shadow);border-radius:8px;padding:8px 10px;font-size:12px;max-width:240px;display:none}
+.tip.on{display:block}.tip b{display:block;font-size:12.5px}.tip span{color:var(--mut)}
+.toast{position:absolute;left:50%;bottom:18px;transform:translate(-50%,20px);opacity:0;background:var(--card);border:1px solid var(--bd);box-shadow:var(--shadow);border-radius:20px;padding:7px 14px;font-size:12px;transition:.25s;z-index:25;pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+/* empty / logged-out */
+.empty{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;color:var(--mut);background:var(--bg);z-index:5}
+.empty.on{display:flex}.empty h3{margin:0;font-size:16px;color:var(--fg);font-weight:650}
+.empty .btn{margin-top:6px;padding:8px 18px;border-radius:var(--r);background:var(--acc);color:var(--acc-fg);font-weight:650}
+.zz{width:46px;height:46px;border-radius:14px;border:1.5px dashed var(--bd);display:grid;place-items:center}
+.zz i{width:10px;height:10px;border-radius:50%;background:var(--mut);opacity:.5}
+/* mini mode */
+body.mini .bar{height:0;overflow:hidden;border:0}
+body.mini .chat{display:none}
+body.mini:hover .bar{height:30px;position:absolute;left:0;right:0;z-index:9;opacity:.96}
+html,body{background:transparent}
+.av img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover}
+.stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+.chat iframe{flex:1;width:100%;border:0;background:var(--bg)}
+body.dragging iframe{pointer-events:none}
+.rz{position:fixed;z-index:50}
+.rz.n,.rz.s{left:10px;right:10px;height:4px;cursor:ns-resize}.rz.e,.rz.w{top:10px;bottom:10px;width:4px;cursor:ew-resize}
+.rz.n{top:0}.rz.s{bottom:0}.rz.e{right:0}.rz.w{left:0}
+.rz.ne,.rz.nw,.rz.se,.rz.sw{width:10px;height:10px}.rz.ne{top:0;right:0;cursor:nesw-resize}.rz.nw{top:0;left:0;cursor:nwse-resize}.rz.se{bottom:0;right:0;cursor:nwse-resize}.rz.sw{bottom:0;left:0;cursor:nesw-resize}
+.code{font:600 26px/1 ui-monospace,monospace;letter-spacing:.2em;color:var(--fg);margin-top:4px}
+.chat-h{justify-content:flex-start}
+</style></head>
+<body>
+<div class="win" id="win">
+  <header class="bar" id="bar">
+    <div class="brand" title="Lurkly"><i></i></div>
+    <div class="tabs-wrap">
+      <div class="tabsbox"><div class="fade l" id="fl"></div>
+      <div class="tabs" id="tabs" role="tablist"></div>
+      <div class="fade r" id="fr"></div></div>
+      <button class="more" id="more" title="All live channels (Ctrl+K)"><span id="moreN">0</span> live ▾</button>
+      <div class="drag"></div>
+    </div>
+    <div class="tools">
+      <button class="ib" id="chatBtn" aria-pressed="false" title="Chat (C)"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-5l-3 2.5v-2.5h-3z"/></svg></button>
+      <button class="ib" id="setBtn" title="Settings"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2"/><path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1"/></svg></button>
+      <span class="sep"></span>
+      <button class="ib" id="wMin" title="Minimise"><svg viewBox="0 0 16 16"><path d="M4 11h8"/></svg></button>
+      <button class="ib" id="wMax" title="Maximise"><svg viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1"/></svg></button>
+      <button class="ib wc close" id="wClose" title="Close"><svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button>
+    </div>
+  </header>
+  <div class="main">
+    <section class="stage" id="stage">
+      <div id="player"></div>
+      <div class="loading" id="loading"><div class="spin"></div></div>
+      <div class="empty" id="empty"><div class="zz"><i></i></div><h3>Nobody you follow is live</h3><div>Checking every 60 s. Tabs appear here as soon as someone goes live.</div></div>
+      <div class="empty" id="login"><div class="zz"><i></i></div><h3 id="loginT">Sign in to Twitch</h3><div id="loginS">Your followed channels show up here as tabs when they go live.</div><div class="code" id="code" hidden></div><button class="btn" id="loginBtn">Sign in with Twitch</button></div>
+      <div class="toast" id="toast"></div>
+    </section>
+    <aside class="chat off" id="chat">
+      <div class="grip" id="grip"></div>
+      <div class="chat-h"><span id="chatT">Chat</span></div>
+      <div id="chatBox" style="flex:1;display:flex;min-height:0"></div>
+    </aside>
+  </div>
+  <div class="pop" id="menu"></div>
+  <div class="pop" id="settings">
+    <div class="acct"><div style="flex:1"><b id="acctName">-</b><small style="display:block;color:var(--mut);font-size:11px">Signed in with Twitch</small></div><button class="link" id="signOut">Sign out</button></div>
+    <div class="hr"></div>
+    <div class="row"><span>Theme</span><div class="seg" id="themeSeg"><button data-t="auto">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button></div></div>
+    <div class="row"><span>Always on top<small>Pairs with mini mode</small></span><div class="sw" id="sw3"></div></div>
+    <div class="row"><span>Mini mode<small>Ctrl+M</small></span><div class="sw" id="sw4"></div></div>
+  </div>
+  <div class="tip" id="tip"></div>
+</div>
+<script>
+const $=id=>document.getElementById(id), T=window.__TAURI__, inv=(c,a)=>T.core.invoke(c,a), W=T.window.getCurrentWindow();
+const store=(k,v)=>{try{if(v===undefined)return localStorage.getItem("lurkly."+k);localStorage.setItem("lurkly."+k,v)}catch(e){return null}};
+let live=[], cur=null, closed=new Set(), signedIn=false, first=true;
+const tabs=$("tabs"), fmt=n=>n>=1000?(n/1000).toFixed(1).replace(".0","")+"k":n;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const avatar=c=>`<span class="av" style="background:var(--acc)">${c.avatar?`<img src="${esc(c.avatar)}" alt="" onerror="this.remove()">`:""}${esc(c.name[0]||"?").toUpperCase()}</span>`;
+/* window chrome */
+$("wMin").onclick=()=>W.minimize();$("wMax").onclick=()=>W.toggleMaximize();$("wClose").onclick=()=>W.close();
+$("bar").addEventListener("mousedown",e=>{if(e.button===0&&!e.target.closest("button,.tab,.more"))W.startDragging()});
+$("bar").addEventListener("dblclick",e=>{if(!e.target.closest("button,.tab,.more"))W.toggleMaximize()});
+for(const d of ["n","s","e","w","ne","nw","se","sw"]){const r=document.createElement("div");r.className="rz "+d;
+ const dir={n:"North",s:"South",e:"East",w:"West",ne:"NorthEast",nw:"NorthWest",se:"SouthEast",sw:"SouthWest"}[d];
+ r.addEventListener("mousedown",e=>{e.preventDefault();W.startResizeDragging(dir)});document.body.appendChild(r)}
+/* tabs */
+function renderTabs(){
+  tabs.innerHTML="";live.forEach(c=>{const b=document.createElement("button");
+   b.className="tab"+(c.login===cur?" active":"")+(c.off?" offline":"")+(c.fresh?" fresh":"");b.role="tab";b.dataset.id=c.login;
+   b.innerHTML=`${avatar(c)}<span class="name">${esc(c.name)}</span><span class="x" title="Close tab (middle-click)">×</span>`;
+   b.onclick=e=>{if(e.target.classList.contains("x"))close(c.login);else select(c.login)};
+   b.onauxclick=e=>{if(e.button===1){e.preventDefault();close(c.login)}};
+   b.onmouseenter=()=>tip(b,c);b.onmouseleave=()=>$("tip").classList.remove("on");tabs.appendChild(b)});
+  $("moreN").textContent=live.length;edge();
+}
+function tip(el,c){const t=$("tip"),r=el.getBoundingClientRect();t.innerHTML=`<b>${esc(c.name)}</b><span>${esc(c.game)} · ${fmt(c.viewers)} viewers</span><br><span>${esc(c.title)}</span>`;t.style.left=Math.max(8,Math.min(r.left,innerWidth-250))+"px";t.style.top="42px";t.classList.add("on")}
+const dark=()=>document.documentElement.dataset.theme==="dark";
+function mount(){
+  const c=live.find(x=>x.login===cur);
+  $("player").innerHTML=c?`<iframe allowfullscreen allow="autoplay; fullscreen" src="https://player.twitch.tv/?channel=${encodeURIComponent(c.login)}&parent=localhost&autoplay=true"></iframe>`:"";
+  $("chatBox").innerHTML=c&&chatOn?`<iframe src="https://www.twitch.tv/embed/${encodeURIComponent(c.login)}/chat?parent=localhost${dark()?"&darkpopout":""}"></iframe>`:"";
+  $("chatT").textContent=c?"Chat · "+c.name:"Chat";
+}
+function select(login){cur=login;store("last",login);$("empty").classList.remove("on");renderTabs();mount();
+  const t=[...tabs.children].find(x=>x.dataset.id===login);t&&t.scrollIntoView({inline:"nearest",block:"nearest"})}
+function close(login){closed.add(login);const i=live.findIndex(x=>x.login===login);live.splice(i,1);
+  if(!live.length){cur=null;renderTabs();mount();$("empty").classList.add("on");return}
+  if(cur===login)select(live[Math.min(i,live.length-1)].login);else renderTabs()}
+const edge=()=>{const t=tabs;$("fl").classList.toggle("on",t.scrollLeft>2);$("fr").classList.toggle("on",t.scrollLeft+t.clientWidth<t.scrollWidth-2);$("more").classList.toggle("on",t.scrollWidth>t.clientWidth+2||live.length>10)};
+tabs.addEventListener("scroll",edge);addEventListener("resize",edge);
+tabs.addEventListener("wheel",e=>{if(e.deltaY){tabs.scrollLeft+=e.deltaY;e.preventDefault()}},{passive:false});
+/* chat */
+let chatOn=store("chat")==="1";
+function setChat(v){chatOn=v;store("chat",v?"1":"0");$("chat").classList.toggle("off",!v);$("chatBtn").setAttribute("aria-pressed",v);mount()}
+$("chatBtn").onclick=()=>setChat(!chatOn);
+{const w=+store("chatw");if(w)document.documentElement.style.setProperty("--chatw",w+"px")}
+$("grip").onmousedown=e=>{const g=$("grip");g.classList.add("drag");document.body.classList.add("dragging");
+ const mv=ev=>{const w=Math.max(240,Math.min(560,innerWidth-ev.clientX));document.documentElement.style.setProperty("--chatw",w+"px");store("chatw",w)};
+ const up=()=>{g.classList.remove("drag");document.body.classList.remove("dragging");removeEventListener("mousemove",mv);removeEventListener("mouseup",up)};
+ addEventListener("mousemove",mv);addEventListener("mouseup",up);e.preventDefault()};
+/* menu + settings */
+function buildMenu(){const m=$("menu");m.innerHTML=[...live].sort((a,b)=>b.viewers-a.viewers).map(c=>`<button class="mi ${c.login===cur?"cur":""}" data-id="${esc(c.login)}">${avatar(c)}<span class="nm"><div>${esc(c.name)}</div><small>${esc(c.game)}</small></span><span class="v">${fmt(c.viewers)}</span></button>`).join("");m.querySelectorAll(".mi").forEach(b=>b.onclick=()=>{select(b.dataset.id);closePops()})}
+const closePops=()=>{$("menu").classList.remove("on");$("settings").classList.remove("on")};
+$("more").onclick=e=>{e.stopPropagation();const o=$("menu").classList.contains("on");closePops();if(!o){buildMenu();$("menu").classList.add("on")}};
+$("setBtn").onclick=e=>{e.stopPropagation();const o=$("settings").classList.contains("on");closePops();if(!o)$("settings").classList.add("on")};
+document.addEventListener("click",e=>{if(!e.target.closest(".pop"))closePops()});
+$("sw3").onclick=()=>{const on=$("sw3").classList.toggle("on");W.setAlwaysOnTop(on)};
+$("sw4").onclick=()=>{$("sw4").classList.toggle("on");document.body.classList.toggle("mini",$("sw4").classList.contains("on"))};
+$("signOut").onclick=async()=>{await inv("logout");closePops();signedIn=false;live=[];cur=null;renderTabs();mount();showLogin()};
+const mq=matchMedia("(prefers-color-scheme: dark)");
+function theme(t){store("theme",t);const d=t==="auto"?mq.matches:t==="dark";document.documentElement.dataset.theme=d?"dark":"light";document.querySelectorAll("#themeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));if(cur&&chatOn)mount()}
+document.querySelectorAll("#themeSeg button").forEach(b=>b.onclick=()=>theme(b.dataset.t));
+theme(store("theme")||"auto");
+/* keys */
+addEventListener("keydown",e=>{const k=e.key;
+ if(k==="c"&&!e.ctrlKey)setChat(!chatOn);else if(e.ctrlKey&&k==="k"){e.preventDefault();$("more").click()}
+ else if(e.ctrlKey&&/[1-9]/.test(k)){e.preventDefault();live[+k-1]&&select(live[+k-1].login)}
+ else if(e.ctrlKey&&k==="Tab"){e.preventDefault();if(!live.length)return;const i=live.findIndex(x=>x.login===cur);select(live[(i+(e.shiftKey?-1:1)+live.length)%live.length].login)}
+ else if(e.ctrlKey&&k==="w"){e.preventDefault();cur&&close(cur)}else if(e.ctrlKey&&k==="m")$("sw4").click();else if(k==="Escape")closePops()});
+function toast(t){const x=$("toast");x.textContent=t;x.classList.add("on");setTimeout(()=>x.classList.remove("on"),2800)}
+/* live polling */
+async function poll(){
+  if(!signedIn)return;
+  let list;try{list=await inv("live_follows")}catch(e){
+    if(String(e)==="auth"){signedIn=false;showLogin();return}
+    console.warn("poll failed",e);return}
+  const seen=new Set(list.map(c=>c.login));
+  closed.forEach(l=>{if(!seen.has(l))closed.delete(l)});
+  live.forEach(c=>{if(!seen.has(c.login)&&!c.off){c.off=true;c.offAt=Date.now();toast(c.name+" went offline")}});
+  for(const n of list){if(closed.has(n.login))continue;
+    const c=live.find(x=>x.login===n.login);
+    if(c){Object.assign(c,n,{off:false})}else{live.push({...n,fresh:!first});if(!first)toast(n.name+" went live")}}
+  live=live.filter(c=>!(c.off&&Date.now()-c.offAt>30000));
+  if(first)live.sort((a,b)=>b.viewers-a.viewers);
+  if(!live.find(x=>x.login===cur))cur=null;
+  if(!cur&&live.length){const last=store("last");select((live.find(x=>x.login===last)||live[0]).login)}
+  else renderTabs();
+  $("empty").classList.toggle("on",!live.length);
+  first=false;
+}
+/* login */
+function showLogin(){$("loginT").textContent="Sign in to Twitch";$("loginS").textContent="Your followed channels show up here as tabs when they go live.";$("code").hidden=true;$("loginBtn").hidden=false;$("login").classList.add("on");$("empty").classList.remove("on")}
+$("loginBtn").onclick=async()=>{
+  try{const d=await inv("auth_start");
+    $("loginBtn").hidden=true;$("loginT").textContent="Approve Lurkly in the Twitch window";$("loginS").textContent="Log in if asked, then press Authorize. Code:";$("code").textContent=d.user_code;$("code").hidden=false;
+    const end=Date.now()+d.expires_in*1000;
+    while(Date.now()<end){await new Promise(r=>setTimeout(r,d.interval*1000));
+      const r=await inv("auth_poll",{deviceCode:d.device_code});
+      if(r==="ok"){await start();return}}
+    showLogin();toast("Sign-in timed out")
+  }catch(e){showLogin();toast("Sign-in failed: "+e)}};
+async function start(){
+  const me=await inv("auth_status");
+  if(!me){showLogin();return}
+  signedIn=true;first=true;$("acctName").textContent=me;$("login").classList.remove("on");
+  await poll();
+}
+setInterval(()=>{poll();const n=Date.now();if(live.some(c=>c.off&&n-c.offAt>30000))poll()},60000);
+setInterval(()=>{if(live.some(c=>c.off)){live=live.filter(c=>!(c.off&&Date.now()-c.offAt>30000));if(!live.find(x=>x.login===cur)){cur=null;live.length?select(live[0].login):(renderTabs(),mount(),$("empty").classList.add("on"))}else renderTabs()}},5000);
+if(chatOn)setChat(true);
+start();
+</script></body></html>

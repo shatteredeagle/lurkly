@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Lurkly",
+  "version": "0.1.0",
+  "identifier": "dev.lurkly.app",
+  "build": { "frontendDist": "../dist" },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "rpm", "appimage"],
+    "category": "Utility",
+    "shortDescription": "Minimal Twitch window with a tab per live followed channel",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.png"]
+  }
+}

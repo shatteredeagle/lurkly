@@ -2,7 +2,7 @@ use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 const PORT: u16 = 14321;
 const CLIENT_ID: &str = "kimne78kx3ncx6brgo4mv6wki5h1ko";
-const QUERY: &str = "query{currentUser{id login subscriptionBenefits(first:100,criteria:{filter:ALL}){edges{node{tier product{name owner{id login displayName stream{id title viewersCount game{displayName}}}}}}pageInfo{hasNextPage}}}}";
+const QUERY: &str = "query{currentUser{id login followedLiveUsers(first:100){edges{node{id login displayName stream{id title viewersCount game{displayName}}}}pageInfo{hasNextPage}}}}";
 
 #[tauri::command]
 async fn open_login(app: tauri::AppHandle) -> Result<(), String> {
@@ -44,34 +44,57 @@ async fn has_token(app: tauri::AppHandle) -> Result<String, String> {
 #[tauri::command]
 async fn fetch_subs(app: tauri::AppHandle) -> Result<String, String> {
     let token = auth_token(&app)?;
-    let res = reqwest::Client::new()
-        .post("https://gql.twitch.tv/gql")
-        .header("Client-ID", CLIENT_ID)
-        .header("Authorization", format!("OAuth {token}"))
-        .json(&serde_json::json!({ "query": QUERY }))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    let status = res.status();
-    let body: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-    // never echo the token; summarise the channels
-    let mut out = format!("HTTP {status}\n");
-    if let Some(errs) = body.get("errors") {
-        out += &format!("errors: {errs}\n");
-    }
-    let edges = body["data"]["currentUser"]["subscriptionBenefits"]["edges"].as_array();
-    match edges {
-        Some(es) => {
-            out += &format!("user: {}  subs: {}\n", body["data"]["currentUser"]["login"], es.len());
-            for e in es {
-                let o = &e["node"]["product"]["owner"];
-                let live = if o["stream"].is_null() { "offline".to_string() } else {
-                    format!("LIVE {} viewers, {}", o["stream"]["viewersCount"], o["stream"]["game"]["displayName"])
-                };
-                out += &format!("- {} [{}] {}\n", o["displayName"].as_str().unwrap_or("?"), e["node"]["tier"].as_str().unwrap_or("?"), live);
-            }
+    let queries = [
+        ("followedLiveUsers(first:20)", "query{currentUser{login followedLiveUsers(first:20){edges{node{login displayName stream{viewersCount game{displayName}}}}}}}"),
+        ("follows(first:100)", "query{currentUser{login follows(first:100){totalCount edges{node{login displayName stream{viewersCount game{displayName}}}}}}}"),
+        ("follows order DESC", "query{currentUser{follows(first:100,order:DESC){edges{node{login stream{viewersCount}}}}}}"),
+    ];
+    let mut out = String::new();
+    for (name, q) in queries {
+        let res = reqwest::Client::new()
+            .post("https://gql.twitch.tv/gql")
+            .header("Client-ID", CLIENT_ID)
+            .header("Authorization", format!("OAuth {token}"))
+            .json(&serde_json::json!({ "query": q }))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        let body: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+        out += &format!("== {name}\n");
+        if let Some(errs) = body.get("errors") {
+            out += &format!("errors: {errs}\n");
+            continue;
         }
-        None => out += &format!("no edges; raw: {body}\n"),
+        let cu = &body["data"]["currentUser"];
+        let key = if cu.get("followedLiveUsers").is_some() { "followedLiveUsers" } else { "follows" };
+        let edges = cu[key]["edges"].as_array().cloned().unwrap_or_default();
+        let live: Vec<_> = edges.iter().filter(|e| !e["node"]["stream"].is_null()).collect();
+        out += &format!("total edges: {}  live: {}  totalCount: {}\n", edges.len(), live.len(), cu[key]["totalCount"]);
+        for e in live.iter().take(30) {
+            let n = &e["node"];
+            out += &format!("- {} LIVE {} viewers\n", n["displayName"].as_str().or(n["login"].as_str()).unwrap_or("?"), n["stream"]["viewersCount"]);
+        }
+    }
+    // Helix with the web client's own token
+    let me = reqwest::Client::new().post("https://gql.twitch.tv/gql").header("Client-ID", CLIENT_ID)
+        .header("Authorization", format!("OAuth {token}"))
+        .json(&serde_json::json!({"query":"query{currentUser{id}}"})).send().await.map_err(|e| e.to_string())?
+        .json::<serde_json::Value>().await.map_err(|e| e.to_string())?;
+    let uid = me["data"]["currentUser"]["id"].as_str().unwrap_or("").to_string();
+    let res = reqwest::Client::new()
+        .get(format!("https://api.twitch.tv/helix/streams/followed?user_id={uid}&first=100"))
+        .header("Client-Id", CLIENT_ID)
+        .header("Authorization", format!("Bearer {token}"))
+        .send().await.map_err(|e| e.to_string())?;
+    let st = res.status();
+    let body: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    out += &format!("== helix streams/followed -> HTTP {st}\n");
+    match body["data"].as_array() {
+        Some(d) => {
+            out += &format!("live followed: {}\n", d.len());
+            for x in d.iter().take(30) { out += &format!("- {} {} viewers\n", x["user_name"].as_str().unwrap_or("?"), x["viewer_count"]); }
+        }
+        None => out += &format!("{body}\n"),
     }
     Ok(out)
 }
