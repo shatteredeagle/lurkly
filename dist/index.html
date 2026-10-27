@@ -146,21 +146,22 @@ body.tdrag,body.tdrag *{cursor:grabbing!important}
 #ins{position:fixed;z-index:60;width:3px;border-radius:2px;background:var(--acc);box-shadow:0 0 8px var(--acc);display:none;pointer-events:none}
 #alertsPop{top:40px;right:44px;width:336px;max-height:calc(100% - 52px);overflow:hidden;display:none;flex-direction:column;padding:6px}
 #alertsPop.on{display:flex}
-#aHead{flex:none}#aList{flex:1;overflow:auto;min-height:60px;max-height:260px}
+#aHead{flex:none}#aList{flex:1;overflow-y:auto;overflow-x:hidden;min-height:60px;max-height:260px;scrollbar-width:thin;padding-right:12px}
+#menu{padding-right:14px}
 .asearch{padding:2px 6px 6px}.asearch input{width:100%;height:30px;border-radius:var(--r);background:var(--bg);border:1px solid var(--bd);color:var(--fg);padding:0 10px;font:inherit}
 .asearch input:focus{outline:none;border-color:var(--acc)}
-.arow{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:6px}.arow:hover{background:var(--hover)}
+.arow{display:flex;align-items:center;gap:8px;padding:3px 6px;border-radius:6px}.arow:hover{background:var(--hover)}
 .arow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lv{font-size:9.5px;font-weight:700;letter-spacing:.06em;color:var(--live);margin-left:4px}
 .amsg{padding:14px;color:var(--mut);text-align:center}
 .qt{display:flex;align-items:center;gap:5px}.qt i{color:var(--mut);font-style:normal;font-size:11px}
 .qt input{width:74px;height:26px;border-radius:6px;background:var(--bg);border:1px solid var(--bd);color:var(--fg);font:inherit;font-size:12px;padding:0 4px;color-scheme:inherit}
-.bellb,.tab .bell{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;color:var(--mut);flex:none}
-.bellb svg,.tab .bell svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.bellb,.tab .bell{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:var(--mut);flex:none}
+.bellb svg,.tab .bell svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .bellb:hover,.tab .bell:hover{background:var(--hover);color:var(--fg)}
 .bellb.on,.tab .bell.on{color:var(--acc)}.bellb.on svg,.tab .bell.on svg{fill:var(--acc)}
-.tab .bell{display:none;width:16px;height:16px}.tab:hover .bell,.tab.active .bell,.tab .bell.on{display:grid}
-.tab .bell svg{width:12px;height:12px}
+.tab .bell{display:none;width:20px;height:20px}.tab:hover .bell,.tab.active .bell,.tab .bell.on{display:grid}
+.tab .bell svg{width:13px;height:13px}
 .mi .bell{margin-left:2px}
 .tab.ing{box-shadow:inset 0 2px 0 color-mix(in srgb,var(--acc) 45%,transparent)}
 #layoutPop{top:40px;right:84px;width:210px;padding:5px}
@@ -481,7 +482,7 @@ function renderAlertsHead(){if(!av)return;const g=av.settings,sn=g.snooze_until*
 function renderAlertsList(){const q=$("aSearch").value.trim().toLowerCase();
   if(!followed){$("aList").innerHTML='<div class="amsg">Loading…</div>';return}
   const rows=followed.filter(f=>!q||f.name.toLowerCase().includes(q)||f.login.includes(q));
-  $("aList").innerHTML=rows.length?rows.map(f=>`<div class="arow"><span class="nm">${esc(f.name)}${f.live?' <b class="lv">LIVE</b>':""}</span><button class="bellb ${bells.has(f.id)?"on":""}" data-id="${esc(f.id)}" aria-pressed="${bells.has(f.id)}" title="Notify when live">${BELL}</button></div>`).join(""):'<div class="amsg">No matches</div>';
+  $("aList").innerHTML=rows.length?rows.map(f=>`<div class="arow"><button class="bellb ${bells.has(f.id)?"on":""}" data-id="${esc(f.id)}" aria-pressed="${bells.has(f.id)}" title="Notify when live">${BELL}</button><span class="nm">${esc(f.name)}${f.live?' <b class="lv">LIVE</b>':""}</span></div>`).join(""):'<div class="amsg">No matches</div>';
   $("aList").querySelectorAll(".bellb").forEach(b=>b.onclick=async()=>{const f=followed.find(x=>x.id===b.dataset.id);await toggleBell(f);f.alert=bells.has(f.id);renderAlertsList()})}
 async function openAlerts(){closePops();await loadAlerts();renderAlertsHead();$("aSearch").value="";followed=null;renderAlertsList();$("alertsPop").classList.add("on");
   try{followed=await inv("followed_channels")}catch(e){$("aList").innerHTML='<div class="amsg">Couldn\'t load your followed channels</div>';return}
