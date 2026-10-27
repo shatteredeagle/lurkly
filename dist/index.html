@@ -120,6 +120,7 @@ body.mini .chat{display:none}
 body.mini:hover .bar{height:30px;position:absolute;left:0;right:0;z-index:9;opacity:.96}
 html,body{background:transparent}
 .av img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover}
+#player{position:absolute;inset:0}#shield{position:absolute;inset:0;z-index:2;cursor:default}
 .stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
 .chat iframe{flex:1;width:100%;border:0;background:var(--bg)}
 body.dragging iframe{pointer-events:none}
@@ -153,6 +154,7 @@ body.dragging iframe{pointer-events:none}
   <div class="main">
     <section class="stage" id="stage">
       <div id="player"></div>
+      <div id="shield"></div>
       <div class="loading" id="loading"><div class="spin"></div></div>
       <div class="empty" id="empty"><div class="zz"><i></i></div><h3>Nobody you follow is live</h3><div>Checking every 60 s. Tabs appear here as soon as someone goes live.</div></div>
       <div class="empty" id="login"><div class="zz"><i></i></div><h3 id="loginT">Sign in to Twitch</h3><div id="loginS">Your followed channels show up here as tabs when they go live.</div><div class="code" id="code" hidden></div><button class="btn" id="loginBtn">Sign in with Twitch</button></div>
@@ -174,6 +176,7 @@ body.dragging iframe{pointer-events:none}
   </div>
   <div class="tip" id="tip"></div>
 </div>
+<script src="https://player.twitch.tv/js/embed/v1.js"></script>
 <script>
 const $=id=>document.getElementById(id), T=window.__TAURI__, inv=(c,a)=>T.core.invoke(c,a), W=T.window.getCurrentWindow();
 const store=(k,v)=>{try{if(v===undefined)return localStorage.getItem("lurkly."+k);localStorage.setItem("lurkly."+k,v)}catch(e){return null}};
@@ -200,11 +203,20 @@ function renderTabs(){
 }
 function tip(el,c){const t=$("tip"),r=el.getBoundingClientRect();t.innerHTML=`<b>${esc(c.name)}</b><span>${esc(c.game)} · ${fmt(c.viewers)} viewers</span><br><span>${esc(c.title)}</span>`;t.style.left=Math.max(8,Math.min(r.left,innerWidth-250))+"px";t.style.top="42px";t.classList.add("on")}
 const dark=()=>document.documentElement.dataset.theme==="dark";
+let player=null;
 function mountPlayer(){
   const c=live.find(x=>x.login===cur);
-  $("player").innerHTML=c?`<iframe allowfullscreen allow="autoplay; fullscreen" src="https://player.twitch.tv/?channel=${encodeURIComponent(c.login)}&parent=localhost&autoplay=true"></iframe>`:"";
+  $("player").innerHTML="";player=null;
+  if(c)player=new Twitch.Player("player",{channel:c.login,parent:["localhost"],autoplay:true,muted:false,controls:false,width:"100%",height:"100%"});
   mountChat();
 }
+/* The shield sits over the player (its controls are hidden): click pauses, double-click fullscreens, wheel / arrows change volume, M mutes. */
+function vol(d){if(!player)return;const v=Math.max(0,Math.min(1,Math.round((player.getVolume()+d)*100)/100));player.setMuted(false);player.setVolume(v);toast("Volume "+Math.round(v*100)+"%")}
+function mute(){if(!player)return;const m=!player.getMuted();player.setMuted(m);toast(m?"Muted":"Unmuted")}
+let clickT=0;
+$("shield").addEventListener("click",()=>{clearTimeout(clickT);clickT=setTimeout(()=>{if(player)player.isPaused()?player.play():player.pause()},220)});
+$("shield").addEventListener("dblclick",()=>{clearTimeout(clickT);document.fullscreenElement?document.exitFullscreen():$("stage").requestFullscreen()});
+$("shield").addEventListener("wheel",e=>{e.preventDefault();vol(e.deltaY<0?.05:-.05)},{passive:false});
 function mountChat(){
   const c=live.find(x=>x.login===cur);
   $("chatBox").innerHTML=c&&chatOn?`<iframe src="https://www.twitch.tv/embed/${encodeURIComponent(c.login)}/chat?parent=localhost${dark()?"&darkpopout":""}"></iframe>`:"";
@@ -245,6 +257,7 @@ addEventListener("keydown",e=>{const k=e.key;
  if(k==="c"&&!e.ctrlKey)setChat(!chatOn);else if(e.ctrlKey&&k==="k"){e.preventDefault();$("more").click()}
  else if(e.ctrlKey&&/[1-9]/.test(k)){e.preventDefault();live[+k-1]&&select(live[+k-1].login)}
  else if(e.ctrlKey&&k==="Tab"){e.preventDefault();if(!live.length)return;const i=live.findIndex(x=>x.login===cur);select(live[(i+(e.shiftKey?-1:1)+live.length)%live.length].login)}
+ else if(k==="m"&&!e.ctrlKey)mute();else if(k==="f"&&!e.ctrlKey)$("shield").dispatchEvent(new Event("dblclick"));else if(k==="ArrowUp"){e.preventDefault();vol(.05)}else if(k==="ArrowDown"){e.preventDefault();vol(-.05)}
  else if(e.ctrlKey&&k==="w"){e.preventDefault();cur&&close(cur)}else if(e.ctrlKey&&k==="m")$("sw4").click();else if(k==="Escape")closePops()});
 function toast(t){const x=$("toast");x.textContent=t;x.classList.add("on");setTimeout(()=>x.classList.remove("on"),2800)}
 /* live polling */
