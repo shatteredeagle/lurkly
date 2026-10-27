@@ -129,6 +129,15 @@ html,body{background:transparent}
 #grid.multi .lbl:not(:empty){display:block}
 #grid.multi .cell.focus::after{content:"";position:absolute;inset:0;border:2px solid var(--acc);z-index:4;pointer-events:none}
 .cell.blank::before{content:"Pick a channel from the tabs";position:absolute;inset:0;display:grid;place-items:center;color:var(--mut);font-size:12px}
+.cell .dz{position:absolute;inset:0;z-index:6;display:none;place-items:center;text-align:center;padding:12px;background:color-mix(in srgb,var(--acc) 30%,transparent);border:3px solid var(--acc);color:#fff;font-weight:650;font-size:13px;text-shadow:0 1px 8px rgba(0,0,0,.6);backdrop-filter:blur(2px);pointer-events:none}
+.cell.drop .dz{display:grid;animation:pop .14s ease-out}
+body.tdrag .cell{outline:2px dashed color-mix(in srgb,var(--acc) 55%,transparent);outline-offset:-5px}
+body.tdrag,body.tdrag *{cursor:grabbing!important}
+.ghost{position:fixed;z-index:100;pointer-events:none;width:132px;height:31px;opacity:.92;box-shadow:var(--shadow);border-radius:7px;background:var(--card)!important;color:var(--fg)!important;transform:translate(-50%,-50%) rotate(-2deg)}
+.cell .pick{position:absolute;right:8px;top:8px;z-index:5;width:26px;height:26px;border-radius:7px;display:none;place-items:center;background:rgba(0,0,0,.55);color:#fff;backdrop-filter:blur(6px)}
+.cell .pick svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.cell .pick:hover{background:var(--acc);color:var(--acc-fg)}
+#grid.multi .cell:hover .pick,#grid.multi .cell.blank .pick{display:grid}
 .tab.ing{box-shadow:inset 0 2px 0 color-mix(in srgb,var(--acc) 45%,transparent)}
 #layoutPop{top:40px;right:84px;width:210px;padding:5px}
 .lo{display:flex;align-items:center;gap:10px;width:100%;padding:6px 8px;border-radius:6px;text-align:left}
@@ -225,7 +234,8 @@ function renderTabs(){
   tabs.innerHTML="";live.forEach(c=>{const b=document.createElement("button");
    b.className="tab"+(c.login===cur?" active":"")+(cells.includes(c.login)&&c.login!==cur?" ing":"")+(c.off?" offline":"")+(c.fresh?" fresh":"");b.role="tab";b.dataset.id=c.login;
    b.innerHTML=`${avatar(c)}<span class="name">${esc(c.name)}</span><span class="x" title="Close tab (middle-click)">×</span>`;
-   b.onclick=e=>{if(e.target.classList.contains("x"))close(c.login);else select(c.login)};
+   b.onclick=e=>{if(dragged)return;if(e.target.classList.contains("x"))close(c.login);else select(c.login)};
+   b.onmousedown=e=>startTabDrag(e,c,b);
    b.onauxclick=e=>{if(e.button===1){e.preventDefault();close(c.login)}};
    b.onmouseenter=()=>tip(b,c);b.onmouseleave=()=>$("tip").classList.remove("on");tabs.appendChild(b)});
   layoutTabs();
@@ -249,7 +259,7 @@ function renderGrid(){
   while(g.children.length>n){g.lastChild.remove();players.pop()}
   for(let i=0;i<n;i++){
     let el=g.children[i];
-    if(!el){el=document.createElement("div");el.className="cell";el.innerHTML='<div class="pl"></div><div class="shield"></div><span class="lbl"></span>';wireCell(el,i);g.appendChild(el)}
+    if(!el){el=document.createElement("div");el.className="cell";el.innerHTML='<div class="pl"></div><div class="shield"></div><span class="lbl"></span><div class="dz"></div><button class="pick" title="Choose channel"><svg viewBox="0 0 16 16"><path d="M3 5.5h9l-2.5-2.5M13 10.5H4l2.5 2.5"/></svg></button>';wireCell(el,i);g.appendChild(el)}
     el.classList.toggle("focus",i===focus);
     const login=cells[i]||"";
     if(el.dataset.login!==login){
@@ -261,6 +271,27 @@ function renderGrid(){
   }
   applyAudio();mountChat();
 }
+function assignCell(i,login){const j=cells.indexOf(login);if(j>=0&&j!==i)[cells[i],cells[j]]=[cells[j],cells[i]];else cells[i]=login;
+  focus=i;cur=cells[i];store("last",login);$("empty").classList.remove("on");renderTabs();renderGrid()}
+/* Drag a tab onto a cell: the cell under the pointer highlights, drop plays that channel there (swapping if it is already showing). */
+let dragged=false;
+function cellAt(x,y){return [...$("grid").children].findIndex(el=>{const r=el.getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom})}
+function startTabDrag(e,c,tab){
+  if(e.button!==0||e.target.classList.contains("x"))return;
+  const sx=e.clientX,sy=e.clientY;let ghost=null,over=-1;
+  const mv=ev=>{
+    if(!ghost){if(Math.hypot(ev.clientX-sx,ev.clientY-sy)<6)return;
+      ghost=tab.cloneNode(true);ghost.className="tab ghost";ghost.style.display="flex";document.body.appendChild(ghost);document.body.classList.add("tdrag","dragging");$("tip").classList.remove("on");
+      [...$("grid").children].forEach(el=>el.querySelector(".dz").textContent="Play "+c.name+" here")}
+    ghost.style.left=ev.clientX+"px";ghost.style.top=ev.clientY+"px";
+    const i=cellAt(ev.clientX,ev.clientY);
+    if(i!==over){[...$("grid").children].forEach((el,k)=>el.classList.toggle("drop",k===i));over=i}};
+  const up=ev=>{removeEventListener("mousemove",mv);removeEventListener("mouseup",up);
+    if(!ghost)return;
+    ghost.remove();document.body.classList.remove("tdrag","dragging");[...$("grid").children].forEach(el=>el.classList.remove("drop"));
+    dragged=true;setTimeout(()=>dragged=false,60);
+    const i=cellAt(ev.clientX,ev.clientY);if(i>=0)assignCell(i,c.login)};
+  addEventListener("mousemove",mv);addEventListener("mouseup",up)}
 function focusCell(i){focus=i;cur=cells[i]||null;if(cur)store("last",cur);renderTabs();renderGrid()}
 const fp=()=>players[focus];
 function vol(d){const p=fp();if(!p)return;const v=Math.max(0,Math.min(1,Math.round((p.getVolume()+d)*100)/100));userMuted=false;p.setMuted(false);p.setVolume(v);toast("Volume "+Math.round(v*100)+"%")}
@@ -270,6 +301,7 @@ let clickT=0;
 function wireCell(el,i){const sh=el.querySelector(".shield");
   sh.addEventListener("click",()=>{clearTimeout(clickT);if(i!==focus){focusCell(i);return}clickT=setTimeout(()=>{const p=players[i];if(p)p.isPaused()?p.play():p.pause()},220)});
   sh.addEventListener("dblclick",()=>{clearTimeout(clickT);setFs(!fs)});
+  el.querySelector(".pick").addEventListener("click",e=>{e.stopPropagation();openMenuFor(i,el)});
   sh.addEventListener("wheel",e=>{e.preventDefault();vol(e.deltaY<0?.05:-.05)},{passive:false})}
 let fs=false,idleT=0;
 async function setFs(v){fs=v;await W.setFullscreen(v);document.body.classList.toggle("fs",v);wake()}
@@ -316,10 +348,13 @@ $("grip").onmousedown=e=>{const g=$("grip");g.classList.add("drag");document.bod
  const up=()=>{g.classList.remove("drag");document.body.classList.remove("dragging");removeEventListener("mousemove",mv);removeEventListener("mouseup",up)};
  addEventListener("mousemove",mv);addEventListener("mouseup",up);e.preventDefault()};
 /* menu + settings */
-function buildMenu(){const m=$("menu");m.innerHTML=[...live].sort((a,b)=>b.viewers-a.viewers).map(c=>`<button class="mi ${c.login===cur?"cur":""}" data-id="${esc(c.login)}">${avatar(c)}<span class="nm"><div>${esc(c.name)}</div><small>${esc(c.game)}</small></span><span class="v">${fmt(c.viewers)}</span></button>`).join("");m.querySelectorAll(".mi").forEach(b=>b.onclick=()=>{select(b.dataset.id);closePops()})}
+let menuTarget=null;
+function buildMenu(){const m=$("menu");m.innerHTML=[...live].sort((a,b)=>b.viewers-a.viewers).map(c=>`<button class="mi ${c.login===cur?"cur":""}" data-id="${esc(c.login)}">${avatar(c)}<span class="nm"><div>${esc(c.name)}</div><small>${esc(c.game)}</small></span><span class="v">${fmt(c.viewers)}</span></button>`).join("");m.querySelectorAll(".mi").forEach(b=>b.onclick=()=>{menuTarget===null?select(b.dataset.id):assignCell(menuTarget,b.dataset.id);closePops()})}
 const closePops=()=>{$("menu").classList.remove("on");$("settings").classList.remove("on");$("layoutPop").classList.remove("on")};
 $("gridBtn").onclick=e=>{e.stopPropagation();const o=$("layoutPop").classList.contains("on");closePops();if(!o){buildLayouts();$("layoutPop").classList.add("on")}};
-$("more").onclick=e=>{e.stopPropagation();const o=$("menu").classList.contains("on");closePops();if(!o){buildMenu();$("menu").classList.add("on")}};
+$("more").onclick=e=>{e.stopPropagation();const o=$("menu").classList.contains("on");closePops();if(!o){menuTarget=null;$("menu").style.left="46px";$("menu").style.top="40px";buildMenu();$("menu").classList.add("on")}};
+function openMenuFor(i,el){closePops();menuTarget=i;buildMenu();const m=$("menu"),r=el.getBoundingClientRect(),w=$("win").getBoundingClientRect();
+  m.style.left=Math.max(8,Math.min(r.right-280-w.left,w.width-280))+"px";m.style.top=Math.max(40,r.top-w.top+36)+"px";m.classList.add("on")}
 $("setBtn").onclick=e=>{e.stopPropagation();const o=$("settings").classList.contains("on");closePops();if(!o)$("settings").classList.add("on")};
 document.addEventListener("click",e=>{if(!e.target.closest(".pop"))closePops()});
 $("sw3").onclick=()=>{const on=$("sw3").classList.toggle("on");W.setAlwaysOnTop(on)};
