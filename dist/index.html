@@ -278,7 +278,7 @@ function renderGrid(){
     if(el.dataset.login!==login){
       el.dataset.login=login;el.classList.toggle("blank",!login);el.classList.remove("paused");players[i]=null;
       const pl=el.querySelector(".pl");pl.innerHTML="";
-      if(login){pl.id="pl"+i+"_"+Date.now();players[i]=new Twitch.Player(pl.id,{channel:login,parent:["localhost"],autoplay:true,muted:i!==focus||userMuted,controls:false,width:"100%",height:"100%"});const pi=players[i];pi.addEventListener(Twitch.Player.READY,applyAudio);pi.addEventListener(Twitch.Player.PAUSE,()=>el.classList.add("paused"));[Twitch.Player.PLAY,Twitch.Player.PLAYING].forEach(ev=>pi.addEventListener(ev,()=>el.classList.remove("paused")))}
+      if(login){pl.id="pl"+i+"_"+Date.now();players[i]=new Twitch.Player(pl.id,{channel:login,parent:["localhost"],autoplay:true,muted:i!==focus||userMuted,controls:false,width:"100%",height:"100%"});const pi=players[i];pi.addEventListener(Twitch.Player.READY,applyAudio);userPaused[i]=false;pi.addEventListener(Twitch.Player.PAUSE,()=>{if(userPaused[i]){el.classList.add("paused");return}autoResume(i);setTimeout(()=>{if(players[i]===pi&&pi.isPaused())el.classList.add("paused")},900)});[Twitch.Player.PLAY,Twitch.Player.PLAYING].forEach(ev=>pi.addEventListener(ev,()=>el.classList.remove("paused")))}
     }
     const c=live.find(x=>x.login===login);el.querySelector(".lbl").textContent=c?c.name:"";
   }
@@ -333,9 +333,13 @@ function mute(){userMuted=!userMuted;applyAudio();toast(userMuted?"Muted":"Unmut
 /* Pause / fullscreen clicks only count away from the window edges (10%, max 100px), so grabbing a corner to resize never pauses. */
 function inZone(ev){const mx=Math.min(innerWidth*.1,100),my=Math.min(innerHeight*.1,100);
   return ev.clientX>mx&&ev.clientX<innerWidth-mx&&ev.clientY>my&&ev.clientY<innerHeight-my}
+/* The embed sometimes pauses itself when the window resizes or maximises. Only pauses we caused (click) stick; others are resumed. */
+const userPaused=[],resumeLog=[];
+function autoResume(i){const t=Date.now(),h=(resumeLog[i]=(resumeLog[i]||[]).filter(x=>t-x<3000));if(h.length>=3)return;h.push(t);
+  setTimeout(()=>{const p=players[i];if(p&&!userPaused[i])try{p.play()}catch(e){}},150)}
 let clickT=0;
 function wireCell(el,i){const sh=el.querySelector(".shield");
-  sh.addEventListener("click",ev=>{clearTimeout(clickT);if(i!==focus){focusCell(i);return}if(!inZone(ev))return;clickT=setTimeout(()=>{const p=players[i];if(p)p.isPaused()?p.play():p.pause()},220)});
+  sh.addEventListener("click",ev=>{clearTimeout(clickT);if(i!==focus){focusCell(i);return}if(!inZone(ev))return;clickT=setTimeout(()=>{const p=players[i];if(!p)return;if(p.isPaused()){userPaused[i]=false;p.play()}else{userPaused[i]=true;p.pause()}},220)});
   sh.addEventListener("dblclick",ev=>{clearTimeout(clickT);if(inZone(ev))setFs(!fs)});
   el.querySelector(".pick").addEventListener("click",e=>{e.stopPropagation();openMenuFor(i,el)});
   sh.addEventListener("wheel",e=>{e.preventDefault();vol(e.deltaY<0?.05:-.05)},{passive:false})}
