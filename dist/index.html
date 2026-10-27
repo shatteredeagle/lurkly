@@ -200,23 +200,27 @@ function renderTabs(){
 }
 function tip(el,c){const t=$("tip"),r=el.getBoundingClientRect();t.innerHTML=`<b>${esc(c.name)}</b><span>${esc(c.game)} · ${fmt(c.viewers)} viewers</span><br><span>${esc(c.title)}</span>`;t.style.left=Math.max(8,Math.min(r.left,innerWidth-250))+"px";t.style.top="42px";t.classList.add("on")}
 const dark=()=>document.documentElement.dataset.theme==="dark";
-function mount(){
+function mountPlayer(){
   const c=live.find(x=>x.login===cur);
   $("player").innerHTML=c?`<iframe allowfullscreen allow="autoplay; fullscreen" src="https://player.twitch.tv/?channel=${encodeURIComponent(c.login)}&parent=localhost&autoplay=true"></iframe>`:"";
+  mountChat();
+}
+function mountChat(){
+  const c=live.find(x=>x.login===cur);
   $("chatBox").innerHTML=c&&chatOn?`<iframe src="https://www.twitch.tv/embed/${encodeURIComponent(c.login)}/chat?parent=localhost${dark()?"&darkpopout":""}"></iframe>`:"";
   $("chatT").textContent=c?"Chat · "+c.name:"Chat";
 }
-function select(login){cur=login;store("last",login);$("empty").classList.remove("on");renderTabs();mount();
+function select(login){cur=login;store("last",login);$("empty").classList.remove("on");renderTabs();mountPlayer();
   const t=[...tabs.children].find(x=>x.dataset.id===login);t&&t.scrollIntoView({inline:"nearest",block:"nearest"})}
 function close(login){closed.add(login);const i=live.findIndex(x=>x.login===login);live.splice(i,1);
-  if(!live.length){cur=null;renderTabs();mount();$("empty").classList.add("on");return}
+  if(!live.length){cur=null;renderTabs();mountPlayer();$("empty").classList.add("on");return}
   if(cur===login)select(live[Math.min(i,live.length-1)].login);else renderTabs()}
 const edge=()=>{const t=tabs;$("fl").classList.toggle("on",t.scrollLeft>2);$("fr").classList.toggle("on",t.scrollLeft+t.clientWidth<t.scrollWidth-2);$("more").classList.toggle("on",t.scrollWidth>t.clientWidth+2||live.length>10)};
 tabs.addEventListener("scroll",edge);addEventListener("resize",edge);
 tabs.addEventListener("wheel",e=>{if(e.deltaY){tabs.scrollLeft+=e.deltaY;e.preventDefault()}},{passive:false});
 /* chat */
 let chatOn=store("chat")==="1";
-function setChat(v){chatOn=v;store("chat",v?"1":"0");$("chat").classList.toggle("off",!v);$("chatBtn").setAttribute("aria-pressed",v);mount()}
+function setChat(v){chatOn=v;store("chat",v?"1":"0");$("chat").classList.toggle("off",!v);$("chatBtn").setAttribute("aria-pressed",v);mountChat()}
 $("chatBtn").onclick=()=>setChat(!chatOn);
 {const w=+store("chatw");if(w)document.documentElement.style.setProperty("--chatw",w+"px")}
 $("grip").onmousedown=e=>{const g=$("grip");g.classList.add("drag");document.body.classList.add("dragging");
@@ -231,9 +235,9 @@ $("setBtn").onclick=e=>{e.stopPropagation();const o=$("settings").classList.cont
 document.addEventListener("click",e=>{if(!e.target.closest(".pop"))closePops()});
 $("sw3").onclick=()=>{const on=$("sw3").classList.toggle("on");W.setAlwaysOnTop(on)};
 $("sw4").onclick=()=>{$("sw4").classList.toggle("on");document.body.classList.toggle("mini",$("sw4").classList.contains("on"))};
-$("signOut").onclick=async()=>{await inv("logout");closePops();signedIn=false;live=[];cur=null;renderTabs();mount();showLogin()};
+$("signOut").onclick=async()=>{await inv("logout");closePops();signedIn=false;live=[];cur=null;renderTabs();mountPlayer();showLogin()};
 const mq=matchMedia("(prefers-color-scheme: dark)");
-function theme(t){store("theme",t);const d=t==="auto"?mq.matches:t==="dark";document.documentElement.dataset.theme=d?"dark":"light";document.querySelectorAll("#themeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));if(cur&&chatOn)mount()}
+function theme(t){store("theme",t);const d=t==="auto"?mq.matches:t==="dark";document.documentElement.dataset.theme=d?"dark":"light";document.querySelectorAll("#themeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));if(cur&&chatOn)mountChat()}
 document.querySelectorAll("#themeSeg button").forEach(b=>b.onclick=()=>theme(b.dataset.t));
 theme(store("theme")||"auto");
 /* keys */
@@ -281,7 +285,7 @@ async function start(){
   await poll();
 }
 setInterval(()=>{poll();const n=Date.now();if(live.some(c=>c.off&&n-c.offAt>30000))poll()},60000);
-setInterval(()=>{if(live.some(c=>c.off)){live=live.filter(c=>!(c.off&&Date.now()-c.offAt>30000));if(!live.find(x=>x.login===cur)){cur=null;live.length?select(live[0].login):(renderTabs(),mount(),$("empty").classList.add("on"))}else renderTabs()}},5000);
+setInterval(()=>{if(live.some(c=>c.off)){live=live.filter(c=>!(c.off&&Date.now()-c.offAt>30000));if(!live.find(x=>x.login===cur)){cur=null;live.length?select(live[0].login):(renderTabs(),mountPlayer(),$("empty").classList.add("on"))}else renderTabs()}},5000);
 if(chatOn)setChat(true);
 start();
 </script></body></html>
