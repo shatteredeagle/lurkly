@@ -10,7 +10,7 @@ First release.
 
 ### Added
 - Drag tabs along the bar to reorder them; the order is remembered between launches.
-- Windows build: a per-user NSIS installer (`-setup.exe`), built by CI alongside the Linux packages.
+- Windows builds: a per-user NSIS installer (`-setup.exe`) and a portable exe (`-portable.exe`, keeps sign-in and settings in a `lurkly-data` folder beside it), built by CI alongside the Linux packages.
 - One tab per live followed channel.
 - Sign-in with the Twitch device-code flow.
 - Official embed player with hidden controls, plus click, wheel and key controls.

@@ -43,7 +43,7 @@ jobs:
             echo 'body<<EOF_NOTES'
             cat "$RUNNER_TEMP/notes.md"
             printf '\n---\n\n'
-            echo '- `.deb` (Debian/Ubuntu), `.rpm` (Fedora/openSUSE), AppImage (anything else), `-setup.exe` (Windows 10/11; unsigned, so SmartScreen may warn)'
+            echo '- `.deb` (Debian/Ubuntu), `.rpm` (Fedora/openSUSE), AppImage (anything else), `-setup.exe` installer or `-portable.exe` (Windows 10/11; unsigned, so SmartScreen may warn)'
             echo '- Arch: the `.pkg.tar.zst` below, or `makepkg -si` from a clone.'
             echo 'Needs `webkit2gtk-4.1`.'
             echo 'EOF_NOTES'
@@ -87,6 +87,16 @@ jobs:
         with:
           releaseId: ${{ needs.bundles.outputs.release_id }}
           args: --bundles nsis
+
+      # A named "...portable..." exe runs in portable mode: sign-in and webview data live in lurkly-data/ beside it.
+      - name: Portable exe
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          cp src-tauri/target/release/lurkly.exe "Lurkly_${v}_x64-portable.exe"
+          gh release upload "$GITHUB_REF_NAME" "Lurkly_${v}_x64-portable.exe" --clobber
 
   arch:
     name: Arch package

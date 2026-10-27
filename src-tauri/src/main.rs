@@ -28,10 +28,22 @@ struct Auth {
 
 struct AppState {
     http: reqwest::Client,
+    /// Set in portable mode: the folder (next to the exe) that holds the sign-in file and the webview profile.
+    portable: Option<PathBuf>,
     auth: Mutex<Option<Auth>>,
     /// Serialises token refreshes: Twitch refresh tokens for public clients are single-use.
     refresh_lock: tauri::async_runtime::Mutex<()>,
     path: PathBuf,
+}
+
+/// Portable mode: the exe is named "...portable..." or sits next to a `lurkly.portable` file. Everything
+/// (tokens, webview cookies and storage) then lives in `lurkly-data/` beside the exe instead of the user profile.
+fn portable_dir() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    let name = exe.file_stem()?.to_string_lossy().to_lowercase();
+    (name.contains("portable") || dir.join("lurkly.portable").exists())
+        .then(|| dir.join("lurkly-data"))
 }
 
 fn now() -> u64 {
@@ -108,11 +120,13 @@ async fn auth_start(
         let _ = w.show();
         let _ = w.set_focus();
     } else {
-        WebviewWindowBuilder::new(&app, "login", WebviewUrl::External(uri))
+        let mut b = WebviewWindowBuilder::new(&app, "login", WebviewUrl::External(uri))
             .title("Sign in to Twitch")
-            .inner_size(520.0, 760.0)
-            .build()
-            .map_err(|e| e.to_string())?;
+            .inner_size(520.0, 760.0);
+        if let Some(d) = &state.portable {
+            b = b.data_directory(d.join("webview"));
+        }
+        b.build().map_err(|e| e.to_string())?;
     }
     Ok(DeviceStart {
         device_code: s("device_code")?,
@@ -456,7 +470,11 @@ fn main() {
             open_release
         ])
         .setup(|app| {
-            let path = app.path().app_config_dir()?.join("auth.json");
+            let portable = portable_dir();
+            let path = match &portable {
+                Some(d) => d.join("auth.json"),
+                None => app.path().app_config_dir()?.join("auth.json"),
+            };
             let auth = fs::read_to_string(&path)
                 .ok()
                 .and_then(|s| serde_json::from_str(&s).ok());
@@ -467,6 +485,7 @@ fn main() {
                     .expect("http client"),
                 auth: Mutex::new(auth),
                 refresh_lock: tauri::async_runtime::Mutex::new(()),
+                portable: portable.clone(),
                 path,
             });
             // the plugin starts its server on a thread; wait until it is accepting before loading the window
@@ -477,13 +496,16 @@ fn main() {
                 std::thread::sleep(std::time::Duration::from_millis(50));
             }
             let url: tauri::Url = format!("http://localhost:{PORT}").parse().unwrap();
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
+            let mut main = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                 .title("Lurkly")
                 .inner_size(1100.0, 680.0)
                 .min_inner_size(320.0, 180.0)
                 .decorations(false)
-                .transparent(true)
-                .build()?;
+                .transparent(true);
+            if let Some(d) = &portable {
+                main = main.data_directory(d.join("webview"));
+            }
+            main.build()?;
             Ok(())
         })
         .run(tauri::generate_context!())
