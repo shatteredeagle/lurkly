@@ -49,6 +49,7 @@ struct AppState {
     /// Channel to open when the window (re)appears after a notification click.
     pending_open: Mutex<Option<String>>,
     notif_map: Mutex<HashMap<i32, String>>,
+    #[cfg_attr(target_os = "linux", allow(dead_code))]
     notif_seq: AtomicI32,
     last_notif: Mutex<Option<String>>,
     poke: tokio::sync::Notify,
@@ -514,20 +515,64 @@ fn open_channel(app: &tauri::AppHandle, login: Option<String>) {
     let _ = app.emit("open-channel", ());
 }
 
-fn notify(app: &tauri::AppHandle, title: &str, body: &str, login: Option<String>) {
+/// Show a desktop notification; clicking it opens `login`'s tab. Linux talks to the notification
+/// server directly (so failures are visible and a click is reliable); Windows uses the Tauri plugin.
+#[cfg(target_os = "linux")]
+fn show_notification(
+    app: &tauri::AppHandle,
+    title: &str,
+    body: &str,
+    login: Option<String>,
+) -> Result<(), String> {
+    use notify_rust::{Hint, Notification, Timeout};
+    let handle = Notification::new()
+        .appname("Lurkly")
+        .summary(title)
+        .body(body)
+        .icon("lurkly")
+        .hint(Hint::DesktopEntry("lurkly".into()))
+        .action("default", "Open")
+        .timeout(Timeout::Milliseconds(10_000))
+        .show()
+        .map_err(|e| e.to_string())?;
+    let app = app.clone();
+    std::thread::spawn(move || {
+        handle.wait_for_action(|action| {
+            if action == "default" {
+                open_channel(&app, login.clone());
+            }
+        });
+    });
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn show_notification(
+    app: &tauri::AppHandle,
+    title: &str,
+    body: &str,
+    login: Option<String>,
+) -> Result<(), String> {
     let st = app.state::<AppState>();
     let id = st.notif_seq.fetch_add(1, Ordering::Relaxed);
     if let Some(l) = login {
         st.notif_map.lock().unwrap().insert(id, l.clone());
         *st.last_notif.lock().unwrap() = Some(l);
     }
-    let _ = app
-        .notification()
+    app.notification()
         .builder()
         .id(id)
         .title(title)
         .body(body)
-        .show();
+        .show()
+        .map_err(|e| e.to_string())
+}
+
+fn notify(app: &tauri::AppHandle, title: &str, body: &str, login: Option<String>) {
+    if let Err(e) = show_notification(app, title, body, login) {
+        eprintln!("lurkly: notification failed: {e}");
+        let _ = app.emit("alert-error", e);
+    }
 }
 
 fn trim(s: &str, n: usize) -> String {

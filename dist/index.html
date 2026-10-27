@@ -536,6 +536,7 @@ async function start(){
 T.event.listen("live-update",e=>{if(signedIn)applyLive(e.payload)});
 T.event.listen("auth-lost",()=>{if(signedIn){reset();showLogin()}});
 T.event.listen("open-channel",()=>takeOpen());
+T.event.listen("alert-error",e=>toast("Notification failed: "+e.payload));
 T.event.listen("went-live",e=>toast((e.payload||[]).join(", ")+" went live"));
 T.event.listen("alerts-changed",()=>loadAlerts().then(()=>{if($("alertsPop").classList.contains("on"))renderAlertsHead()}));
 setInterval(()=>{if(live.some(c=>c.off&&Date.now()-c.offAt>30000)){live=live.filter(c=>!(c.off&&Date.now()-c.offAt>30000));fillCells();renderTabs();renderGrid();$("empty").classList.toggle("on",!live.length)}},5000);
