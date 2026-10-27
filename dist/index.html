@@ -130,6 +130,16 @@ body.dragging iframe{pointer-events:none}
 .rz.ne,.rz.nw,.rz.se,.rz.sw{width:10px;height:10px}.rz.ne{top:0;right:0;cursor:nesw-resize}.rz.nw{top:0;left:0;cursor:nwse-resize}.rz.se{bottom:0;right:0;cursor:nwse-resize}.rz.sw{bottom:0;left:0;cursor:nesw-resize}
 .code{font:600 26px/1 ui-monospace,monospace;letter-spacing:.2em;color:var(--fg);margin-top:4px}
 .chat-h{justify-content:flex-start}
+/* fullscreen: the whole window goes fullscreen and the tab bar floats over the video */
+body.fs .bar{position:absolute;top:0;left:0;right:0;z-index:9;background:rgba(14,13,19,.52);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px);border-bottom-color:rgba(255,255,255,.08);color:#ecebf2;transition:opacity .2s,transform .2s}
+body.fs .win{border:0;border-radius:0}
+body.fs .tab{color:rgba(236,235,242,.7)}body.fs .tab:hover{background:rgba(255,255,255,.08);color:#fff}
+body.fs .tab.active{background:rgba(255,255,255,.14);color:#fff}
+body.fs .tab.active::before,body.fs .tab.active::after{display:none}
+body.fs .av::after{border-color:transparent}
+body.fs .fade.l{background:linear-gradient(90deg,rgba(14,13,19,.8),transparent)}body.fs .fade.r{background:linear-gradient(270deg,rgba(14,13,19,.8),transparent)}
+body.fs.idle .bar{opacity:0;transform:translateY(-100%);pointer-events:none}
+body.fs.idle,body.fs.idle #shield{cursor:none}
 </style></head>
 <body>
 <div class="win" id="win">
@@ -215,7 +225,11 @@ function vol(d){if(!player)return;const v=Math.max(0,Math.min(1,Math.round((play
 function mute(){if(!player)return;const m=!player.getMuted();player.setMuted(m);toast(m?"Muted":"Unmuted")}
 let clickT=0;
 $("shield").addEventListener("click",()=>{clearTimeout(clickT);clickT=setTimeout(()=>{if(player)player.isPaused()?player.play():player.pause()},220)});
-$("shield").addEventListener("dblclick",()=>{clearTimeout(clickT);document.fullscreenElement?document.exitFullscreen():$("stage").requestFullscreen()});
+let fs=false,idleT=0;
+async function setFs(v){fs=v;await W.setFullscreen(v);document.body.classList.toggle("fs",v);wake()}
+function wake(){document.body.classList.remove("idle");clearTimeout(idleT);if(fs)idleT=setTimeout(()=>{if(!document.querySelector(".bar:hover,.pop.on"))document.body.classList.add("idle")},2500)}
+addEventListener("mousemove",wake);
+$("shield").addEventListener("dblclick",()=>{clearTimeout(clickT);setFs(!fs)});
 $("shield").addEventListener("wheel",e=>{e.preventDefault();vol(e.deltaY<0?.05:-.05)},{passive:false});
 function mountChat(){
   const c=live.find(x=>x.login===cur);
@@ -258,7 +272,7 @@ addEventListener("keydown",e=>{const k=e.key;
  else if(e.ctrlKey&&/[1-9]/.test(k)){e.preventDefault();live[+k-1]&&select(live[+k-1].login)}
  else if(e.ctrlKey&&k==="Tab"){e.preventDefault();if(!live.length)return;const i=live.findIndex(x=>x.login===cur);select(live[(i+(e.shiftKey?-1:1)+live.length)%live.length].login)}
  else if(k==="m"&&!e.ctrlKey)mute();else if(k==="f"&&!e.ctrlKey)$("shield").dispatchEvent(new Event("dblclick"));else if(k==="ArrowUp"){e.preventDefault();vol(.05)}else if(k==="ArrowDown"){e.preventDefault();vol(-.05)}
- else if(e.ctrlKey&&k==="w"){e.preventDefault();cur&&close(cur)}else if(e.ctrlKey&&k==="m")$("sw4").click();else if(k==="Escape")closePops()});
+ else if(e.ctrlKey&&k==="w"){e.preventDefault();cur&&close(cur)}else if(e.ctrlKey&&k==="m")$("sw4").click();else if(k==="Escape"){closePops();if(fs)setFs(false)}});
 function toast(t){const x=$("toast");x.textContent=t;x.classList.add("on");setTimeout(()=>x.classList.remove("on"),2800)}
 /* live polling */
 async function poll(){
