@@ -330,10 +330,13 @@ const fp=()=>players[focus];
 function vol(d){const p=fp();if(!p)return;const cv=p.getVolume();if(!isFinite(cv))return;const v=Math.max(0,Math.min(1,Math.round((cv+d)*100)/100));userMuted=false;p.setMuted(false);p.setVolume(v);toast("Volume "+Math.round(v*100)+"%")}
 function mute(){userMuted=!userMuted;applyAudio();toast(userMuted?"Muted":"Unmuted")}
 /* Each cell has a shield over its player (controls are hidden): click focuses / pauses, double-click fullscreens, wheel changes volume. */
+/* Pause / fullscreen clicks only count away from the window edges (10%, max 100px), so grabbing a corner to resize never pauses. */
+function inZone(ev){const mx=Math.min(innerWidth*.1,100),my=Math.min(innerHeight*.1,100);
+  return ev.clientX>mx&&ev.clientX<innerWidth-mx&&ev.clientY>my&&ev.clientY<innerHeight-my}
 let clickT=0;
 function wireCell(el,i){const sh=el.querySelector(".shield");
-  sh.addEventListener("click",()=>{clearTimeout(clickT);if(i!==focus){focusCell(i);return}clickT=setTimeout(()=>{const p=players[i];if(p)p.isPaused()?p.play():p.pause()},220)});
-  sh.addEventListener("dblclick",()=>{clearTimeout(clickT);setFs(!fs)});
+  sh.addEventListener("click",ev=>{clearTimeout(clickT);if(i!==focus){focusCell(i);return}if(!inZone(ev))return;clickT=setTimeout(()=>{const p=players[i];if(p)p.isPaused()?p.play():p.pause()},220)});
+  sh.addEventListener("dblclick",ev=>{clearTimeout(clickT);if(inZone(ev))setFs(!fs)});
   el.querySelector(".pick").addEventListener("click",e=>{e.stopPropagation();openMenuFor(i,el)});
   sh.addEventListener("wheel",e=>{e.preventDefault();vol(e.deltaY<0?.05:-.05)},{passive:false})}
 let fs=false,idleT=0;
