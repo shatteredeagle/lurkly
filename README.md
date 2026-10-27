@@ -34,6 +34,7 @@ Playback and chat are Twitch's own official embeds, so the video is the real pla
 - **Tab overflow:** when tabs run out of room, a `+N` button opens a list of every live channel.
 - **Themes:** Auto (follows your system), Light or Dark.
 - **Always on top** and a **mini mode** that collapses the window to just the video.
+- **Reorder tabs** by dragging them along the bar; a violet line shows where the tab will land, and the order is remembered.
 - **Update notice:** checks GitHub releases once a day (switch it off in Settings) and tells you when a newer version is out. Settings has a **Check for updates** button that opens the release page. It never replaces itself, so `.deb`, `.rpm` and Arch installs stay under your package manager's control.
 - Frameless window with its own title bar. One instance at a time.
 

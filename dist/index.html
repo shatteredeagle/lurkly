@@ -140,6 +140,7 @@ body.tdrag,body.tdrag *{cursor:grabbing!important}
 #grid.multi .cell:hover .pick,#grid.multi .cell.blank .pick{display:grid}
 .ib{position:relative}#setBtn.upd::after{content:"";position:absolute;top:4px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--acc)}
 #verT small{display:block;color:var(--mut);font-size:11px}
+#ins{position:fixed;z-index:60;width:3px;border-radius:2px;background:var(--acc);box-shadow:0 0 8px var(--acc);display:none;pointer-events:none}
 .tab.ing{box-shadow:inset 0 2px 0 color-mix(in srgb,var(--acc) 45%,transparent)}
 #layoutPop{top:40px;right:84px;width:210px;padding:5px}
 .lo{display:flex;align-items:center;gap:10px;width:100%;padding:6px 8px;border-radius:6px;text-align:left}
@@ -215,6 +216,7 @@ body.fs.idle,body.fs.idle #shield{cursor:none}
     <div class="row"><span>Mini mode<small>Ctrl+M</small></span><div class="sw" id="sw4"></div></div>
   </div>
   <div class="tip" id="tip"></div>
+  <div id="ins"></div>
 </div>
 <script src="https://player.twitch.tv/js/embed/v1.js"></script>
 <script>
@@ -284,24 +286,42 @@ function assignCell(i,login){const j=cells.indexOf(login);if(j>=0&&j!==i)[cells[
 /* Drag a tab onto a cell: the cell under the pointer highlights, drop plays that channel there (swapping if it is already showing). */
 let dragged=false;
 function cellAt(x,y){return [...$("grid").children].findIndex(el=>{const r=el.getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom})}
+function barBottom(){return $("bar").getBoundingClientRect().bottom+4}
+/* Where would a dragged tab land in the bar? Returns {before|after: login, x, top, h} or null. */
+function insertAt(x,skip){
+  const els=[...tabs.children].filter(e=>e.style.display!=="none"&&e.dataset.id!==skip);if(!els.length)return null;
+  for(const e of els){const r=e.getBoundingClientRect();if(x<r.left+r.width/2)return{before:e.dataset.id,x:r.left-1,top:r.top,h:r.height}}
+  const r=els[els.length-1].getBoundingClientRect();return{after:els[els.length-1].dataset.id,x:r.right+1,top:r.top,h:r.height}}
+function reorderTo(login,t){
+  const from=live.findIndex(x=>x.login===login);if(from<0)return;const [item]=live.splice(from,1);
+  let to=live.findIndex(x=>x.login===(t.before||t.after));to=to<0?live.length:t.after?to+1:to;
+  live.splice(to,0,item);store("order",JSON.stringify(live.map(x=>x.login)));renderTabs()}
+/* Drag a tab: along the bar it reorders (a line shows where it lands); down onto the stage it picks a grid cell (the cell highlights). */
 function startTabDrag(e,c,tab){
   if(e.button!==0||e.target.classList.contains("x"))return;
-  const sx=e.clientX,sy=e.clientY;let ghost=null,over=-1;
+  const sx=e.clientX,sy=e.clientY,ins=$("ins");let ghost=null,over=-1,slot=null;
+  const clear=()=>{ins.style.display="none";[...$("grid").children].forEach(el=>el.classList.remove("drop"))};
+  const end=(ev,ok)=>{removeEventListener("mousemove",mv);removeEventListener("mouseup",up);removeEventListener("blur",cancel);removeEventListener("keydown",cancel);
+    if(!ghost)return;
+    ghost.remove();ghost=null;tab.style.opacity="";document.body.classList.remove("tdrag","dragging");clear();
+    dragged=true;setTimeout(()=>dragged=false,60);
+    if(!ok)return;
+    if(ev.clientY<barBottom()){if(slot)reorderTo(c.login,slot)}
+    else{const i=cellAt(ev.clientX,ev.clientY);if(i>=0)assignCell(i,c.login)}};
   const mv=ev=>{
     if(!ghost){if(Math.hypot(ev.clientX-sx,ev.clientY-sy)<6)return;
-      ghost=tab.cloneNode(true);ghost.className="tab ghost";ghost.style.display="flex";document.body.appendChild(ghost);document.body.classList.add("tdrag","dragging");$("tip").classList.remove("on");
+      ghost=tab.cloneNode(true);ghost.className="tab ghost";ghost.style.display="flex";document.body.appendChild(ghost);document.body.classList.add("tdrag","dragging");$("tip").classList.remove("on");tab.style.opacity=".35";
       [...$("grid").children].forEach(el=>el.querySelector(".dz").textContent="Play "+c.name+" here")}
     ghost.style.left=ev.clientX+"px";ghost.style.top=ev.clientY+"px";
-    const i=cellAt(ev.clientX,ev.clientY);
-    if(i!==over){[...$("grid").children].forEach((el,k)=>el.classList.toggle("drop",k===i));over=i}};
-  const up=ev=>{removeEventListener("mousemove",mv);removeEventListener("mouseup",up);
-    if(!ghost)return;
-    ghost.remove();document.body.classList.remove("tdrag","dragging");[...$("grid").children].forEach(el=>el.classList.remove("drop"));
-    dragged=true;setTimeout(()=>dragged=false,60);
-    const i=cellAt(ev.clientX,ev.clientY);if(i>=0)assignCell(i,c.login)};
-  addEventListener("mousemove",mv);addEventListener("mouseup",up);
-  const cancel=ev=>{if(ev.type==="keydown"&&ev.key!=="Escape")return;removeEventListener("blur",cancel);removeEventListener("keydown",cancel);up({clientX:-1,clientY:-1})};
-  addEventListener("blur",cancel);addEventListener("keydown",cancel)}
+    if(ev.clientY<barBottom()){
+      [...$("grid").children].forEach(el=>el.classList.remove("drop"));over=-1;
+      slot=insertAt(ev.clientX,c.login);
+      if(slot){ins.style.display="block";ins.style.left=slot.x-1+"px";ins.style.top=slot.top+"px";ins.style.height=slot.h+"px"}else ins.style.display="none"}
+    else{ins.style.display="none";slot=null;const i=cellAt(ev.clientX,ev.clientY);
+      if(i!==over){[...$("grid").children].forEach((el,k)=>el.classList.toggle("drop",k===i));over=i}}};
+  const up=ev=>end(ev,true);
+  const cancel=ev=>{if(ev.type==="keydown"&&ev.key!=="Escape")return;end(ev,false)};
+  addEventListener("mousemove",mv);addEventListener("mouseup",up);addEventListener("blur",cancel);addEventListener("keydown",cancel)}
 function focusCell(i){focus=i;cur=cells[i]||null;if(cur)store("last",cur);renderTabs();renderGrid()}
 const fp=()=>players[focus];
 function vol(d){const p=fp();if(!p)return;const cv=p.getVolume();if(!isFinite(cv))return;const v=Math.max(0,Math.min(1,Math.round((cv+d)*100)/100));userMuted=false;p.setMuted(false);p.setVolume(v);toast("Volume "+Math.round(v*100)+"%")}
@@ -420,7 +440,9 @@ async function pollOnce(gen){
     const c=live.find(x=>x.login===n.login);
     if(c){Object.assign(c,n,{off:false})}else{live.push({...n,fresh:!first});if(!first)toast(n.name+" went live")}}
   live=live.filter(c=>!(c.off&&Date.now()-c.offAt>30000));
-  if(first)live.sort((a,b)=>b.viewers-a.viewers);
+  if(first){let ord=[];try{ord=JSON.parse(store("order")||"[]")}catch(e){}
+    const rank=l=>{const i=ord.indexOf(l);return i<0?Infinity:i};
+    live.sort((a,b)=>rank(a.login)-rank(b.login)||b.viewers-a.viewers)}
   if(first&&!cells.some(Boolean)){const last=store("last");if(last&&live.some(c=>c.login===last))cells[0]=last}
   fillCells();renderTabs();renderGrid();
   $("empty").classList.toggle("on",!live.length);
